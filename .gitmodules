@@ -1,0 +1,9 @@
+[submodule "seo_rise"]
+	path = seo_rise
+	url = https://github.com/ErdemGunseli/SEORise
+[submodule "heard"]
+	path = heard
+	url = https://github.com/ErdemGunseli/Heard
+[submodule "in_sight"]
+	path = in_sight
+	url = https://github.com/ErdemGunseli/In-Sight-AI
