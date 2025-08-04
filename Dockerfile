@@ -2,11 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Loading submodules manually:
-RUN apt-get update \
- && apt-get install -y git \
- && git config --global --add safe.directory /app \
- && git submodule update --init --recursive
+# Submodules need to be loaded on hosting via pre-deploy command
 
 # Copying gateway entrypoint:
 COPY main.py .
