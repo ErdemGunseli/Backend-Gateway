@@ -34,20 +34,20 @@ def load_app(filepath: str):
 
 # ────────── SEO Rise ───────────────────────────────────
 keys = inject_env_vars("seo_rise")
-seo_app = load_app("seo_rise/fastapi-backend/app.py")
+seo_app = load_app("seo_rise/fastapi-backend/main.py")
 app.mount("/seo-rise", seo_app)
 clear_env_vars(keys)
 
 
 # ────────── In-Sight ───────────────────────────────────
 keys = inject_env_vars("in_sight")
-insight_app = load_app("in_sight/fastapi-backend/app.py")
+insight_app = load_app("in_sight/fastapi-backend/main.py")
 app.mount("/in-sight", insight_app)
 clear_env_vars(keys)
 
 
 # ────────── Heard ──────────────────────────────────────
 keys = inject_env_vars("heard")
-heard_app = load_app("heard/fastapi-backend/app.py")
+heard_app = load_app("heard/fastapi-backend/main.py")
 app.mount("/heard", heard_app)
 clear_env_vars(keys)
