@@ -1,0 +1,25 @@
+# ───── FRONTEND FOLDERS ─────
+seo_rise/next-pwa/
+in_sight/react-extension/
+heard/frontend/
+
+# ───── BUILD OUTPUTS ─────
+**/build/
+**/*.zip
+
+# ───── NODE + STATIC JUNK ─────
+**/node_modules/
+**/dist/
+**/public/
+**/.next/
+
+# ───── OS/IDE FILES ─────
+**/.DS_Store
+**/*.log
+**/.vscode/
+**/__pycache__/
+**/*.pyc
+
+# ───── GIT FILES ─────
+.git/
+.gitmodules
