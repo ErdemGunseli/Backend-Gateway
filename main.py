@@ -1,11 +1,12 @@
 import os
 import json
+import importlib.util
 from fastapi import FastAPI
 from typing import List
 
 app = FastAPI(title="Backend Gateway")
 
-# Loading full per-tenant config from central env var:
+# Load full per-tenant config from central env var
 TENANT_CONFIG = json.loads(os.getenv("TENANT_CONFIG", "{}"))
 
 
@@ -25,36 +26,37 @@ def clear_env_vars(keys: List[str]):
         os.environ.pop(key, None)
 
 
+def load_app(path: str):
+    spec = importlib.util.spec_from_file_location("module", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.app
+
 
 """
 Multi-Tenant Env Var Injection Pattern:
 1. INJECT: Set tenant-specific env vars
-2. IMPORT: Import tenant app - ALL module-level code executes immediately, 
-   capturing config values into Python objects (database engines, connections, etc.)
+2. IMPORT: Load tenant app file - executes module-level code immediately
 3. MOUNT: Mount the fully-configured app to a route
-4. CLEAR: Remove env vars - safe because config is already captured in imported modules
-
-Global env vars (e.g. DATABASE_URL) can be shared between tenants, 
-but tenants CANNOT have vars with the same identifier.
+4. CLEAR: Remove env vars - safe because config is already captured
 """
-
 
 # ───── SEO Rise ─────
 seo_env_keys = inject_env_vars("seo_rise")
-from seo_rise.fastapi_backend.app import app as seo_app
+seo_app = load_app("seo_rise/fastapi-backend/app.py")
 app.mount("/seo-rise", seo_app)
 clear_env_vars(seo_env_keys)
 
 
 # ───── In-Sight ─────
 insight_env_keys = inject_env_vars("in_sight")
-from in_sight.fastapi_backend.app import app as insight_app
+insight_app = load_app("in_sight/fastapi-backend/app.py")
 app.mount("/in-sight", insight_app)
 clear_env_vars(insight_env_keys)
 
 
 # ───── Heard ─────
 heard_env_keys = inject_env_vars("heard")
-from heard.fastapi_backend.app import app as heard_app
+heard_app = load_app("heard/fastapi-backend/app.py")
 app.mount("/heard", heard_app)
 clear_env_vars(heard_env_keys)

@@ -6,12 +6,12 @@ WORKDIR /app
 COPY main.py .
 
 # Copying backend source code:
-# NOTE: Renaming directories to valid Python module names (underscores not dashes)
+# Renaming "fastapi-backend" -> "fastapi_backend" (Python-compatible)
 COPY seo_rise/fastapi-backend/ seo_rise/fastapi_backend/
 COPY in_sight/fastapi-backend/ in_sight/fastapi_backend/
 COPY heard/fastapi-backend/ heard/fastapi_backend/
 
-# Copying requirement files, renaming:
+# Copying requirement files:
 COPY seo_rise/fastapi-backend/requirements.txt requirements-seo.txt
 COPY in_sight/fastapi-backend/requirements.txt requirements-insight.txt
 COPY heard/fastapi-backend/requirements.txt requirements-heard.txt
