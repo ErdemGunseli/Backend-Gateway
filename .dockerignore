@@ -20,6 +20,3 @@ heard/frontend/
 **/__pycache__/
 **/*.pyc
 
-# ───── GIT FILES ─────
-.git/
-.gitmodules
