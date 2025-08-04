@@ -6,7 +6,7 @@ from typing import List
 
 app = FastAPI(title="Backend Gateway")
 
-# Load full per-tenant config from central env var
+# Load tenant config from env
 TENANT_CONFIG = json.loads(os.getenv("TENANT_CONFIG", "{}"))
 
 
@@ -27,7 +27,7 @@ def clear_env_vars(keys: List[str]):
 
 
 def load_app(path: str):
-    spec = importlib.util.spec_from_file_location("module", path)
+    spec = importlib.util.spec_from_file_location("sub_app", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.app
@@ -43,20 +43,20 @@ Multi-Tenant Env Var Injection Pattern:
 
 # ───── SEO Rise ─────
 seo_env_keys = inject_env_vars("seo_rise")
-seo_app = load_app("seo_rise/fastapi-backend/app.py")
+seo_app = load_app("seo_rise/fastapi_backend/app.py")
 app.mount("/seo-rise", seo_app)
 clear_env_vars(seo_env_keys)
 
 
 # ───── In-Sight ─────
 insight_env_keys = inject_env_vars("in_sight")
-insight_app = load_app("in_sight/fastapi-backend/app.py")
+insight_app = load_app("in_sight/fastapi_backend/app.py")
 app.mount("/in-sight", insight_app)
 clear_env_vars(insight_env_keys)
 
 
 # ───── Heard ─────
 heard_env_keys = inject_env_vars("heard")
-heard_app = load_app("heard/fastapi-backend/app.py")
+heard_app = load_app("heard/fastapi_backend/app.py")
 app.mount("/heard", heard_app)
 clear_env_vars(heard_env_keys)
