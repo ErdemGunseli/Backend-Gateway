@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Pulling submodules so folders aren't empty:
+RUN apt-get update && apt-get install -y git \
+ && git submodule update --init --recursive
+
 # Copying gateway entrypoint:
 COPY main.py .
 
@@ -16,8 +20,8 @@ COPY in_sight/fastapi-backend/requirements.txt   requirements-insight.txt
 COPY heard/fastapi-backend/requirements.txt      requirements-heard.txt
 
 # Installing dependencies:
-RUN pip install --no-cache-dir -r requirements-seo.txt      \
- && pip install --no-cache-dir -r requirements-insight.txt  \
+RUN pip install --no-cache-dir -r requirements-seo.txt \
+ && pip install --no-cache-dir -r requirements-insight.txt \
  && pip install --no-cache-dir -r requirements-heard.txt
 
 # Exposing port:
