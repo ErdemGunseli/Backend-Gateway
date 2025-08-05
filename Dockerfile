@@ -17,6 +17,11 @@ RUN echo "# Generated for Python imports - SEO Rise package" > seo_rise/__init__
 RUN echo "# Generated for Python imports - In-Sight package" > in_sight/__init__.py  
 RUN echo "# Generated for Python imports - Heard package" > heard/__init__.py
 
+# Creating fastapi_backend __init__.py files to expose apps (no source code requirements):
+RUN echo "from .main import app" > seo_rise/fastapi_backend/__init__.py
+RUN echo "from .main import app" > in_sight/fastapi_backend/__init__.py
+RUN echo "from .main import app" > heard/fastapi_backend/__init__.py
+
 # Copying requirement files:
 COPY seo_rise/fastapi_backend/requirements.txt   requirements-seo.txt
 COPY in_sight/fastapi_backend/requirements.txt   requirements-insight.txt
