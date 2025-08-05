@@ -1,6 +1,5 @@
 import os
 import json
-import importlib.util
 from fastapi import FastAPI
 from typing import List
 
@@ -25,33 +24,22 @@ def clear_env_vars(keys: List[str]):
         os.environ.pop(k, None)
 
 
-def load_app_direct(project_name: str):
-    # Using unique module name to prevent sys.modules caching conflicts:
-    unique_module_name = f"{project_name}_fastapi_backend"
-    module_path = f"{project_name}/fastapi_backend/__init__.py"
-    
-    spec = importlib.util.spec_from_file_location(unique_module_name, module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.app
-
-
 # ────────── SEO Rise ───────────────────────────────────
 keys = inject_env_vars("seo_rise")
-seo_app = load_app_direct("seo_rise")
+from seo_rise.fastapi_backend import app as seo_app
 app.mount("/seo-rise", seo_app)
 clear_env_vars(keys)
 
 
 # ────────── In-Sight ───────────────────────────────────
 keys = inject_env_vars("in_sight")
-insight_app = load_app_direct("in_sight")
+from in_sight.fastapi_backend import app as insight_app
 app.mount("/in-sight", insight_app)
 clear_env_vars(keys)
 
 
 # ────────── Heard ──────────────────────────────────────
 keys = inject_env_vars("heard")
-heard_app = load_app_direct("heard")
+from heard.fastapi_backend import app as heard_app
 app.mount("/heard", heard_app)
 clear_env_vars(keys)
