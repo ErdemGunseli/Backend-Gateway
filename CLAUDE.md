@@ -195,11 +195,15 @@ types if it uses SQLite; a fast dependency-free health endpoint.
 from this repo, hosting all three projects, each against its real production
 database. Access paths today:
 
-| Project | Path on the service host (works now) | Host-routed (live once the zone activates, §8) | Extra host (ready in Caddy) |
+| Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Extra host (ready in Caddy) |
 |---|---|---|---|
-| heard | `https://backend-gateway-zyu0.onrender.com/heard/…` | `api.heard.erdemgunseli.com` | `api.heard.cc` (still on the standalone Heard Backend) |
-| insight | `…/insight/…` and the legacy `…/in-sight/…` | `api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `api.in-sight.ai` (no DNS record exists) |
-| seorise | `…/seorise/…` and the legacy `…/seo-rise/…` | `api.seorise.erdemgunseli.com` | - |
+| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | `api.heard.cc` (still on the standalone Heard Backend) |
+| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` (no DNS record exists) |
+| seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - |
+
+Host routing was verified live the same day: `/healthz` or `/`, `/docs` with its spec,
+and a DB-backed login lookup on each of the three hosts, from this environment and
+from an outside vantage point.
 
 **Validated locally before deploy** (real Caddy 2.10 + supervisord 4.2.5 + the
 three venvs, throwaway SQLite secrets): Host routing for every host incl. extra
@@ -217,14 +221,14 @@ a 512 MB instance - the headroom is thin; see §8.
 
 ## 8. Remaining work
 
-1. **erdemgunseli.com moves to Cloudflare** (owner agreed 2026-09-06). The zone
-   exists on the factory's Cloudflare account (pending, nameservers
-   `jeff`/`savanna.ns.cloudflare.com`) with the three `api.<name>` CNAMEs already
-   staged, DNS-only, and the three hostnames are registered on the Render service.
-   Owner action: switch the nameservers at GoDaddy (runbook handed over on
-   2026-09-06), then the registrar transfer at their pace. Once the zone is active,
-   verify each host answers 200 over HTTPS and update the ledger. The In-Sight
-   extension points at `api.insight.erdemgunseli.com` and comes back to life then.
+1. **erdemgunseli.com's registrar transfer to Cloudflare** (owner-paced). DNS is
+   done: the zone went active on Cloudflare on 2026-09-06 and the three `api.<name>`
+   hosts are verified and serving. What remains is the registration itself - unlock
+   + auth code at GoDaddy, then Cloudflare's transfer page (runbook handed over
+   2026-09-06) - after which the factory's domain tooling sets auto-renew, the
+   registrar lock and DNSSEC. The In-Sight extension points at
+   `api.insight.erdemgunseli.com`, which now resolves; a store release is what
+   ships it to users.
 2. **Move `api.heard.cc` onto the gateway** (then suspend the standalone "Heard
    Backend"): `gateway domains "Heard Backend" --remove api.heard.cc` then `gateway
    domains --add api.heard.cc`. Its DNS CNAME already points at Render (at a
@@ -289,6 +293,14 @@ Kept for the record; nothing here is pending.
   every project process was already up (2026-09-06). The Dockerfile re-copies the
   binary with plain `cp` to drop the xattr. Apply the same to any other binary
   lifted from a vendor image.
+- **Render certificate issuance can stall for one hostname.** Two of the three
+  `api.<name>` domains got their certificates within ten minutes of verification;
+  `api.heard` sat at "verified" with no certificate for 25 minutes (TLS handshake
+  failure from Render's edge, `no peer certificate`). Removing and re-adding the
+  custom domain (`gateway domains --remove` / `--add` / `--verify`) issued it within
+  30 seconds (2026-09-06). Check with `openssl s_client -servername <host>` before
+  assuming DNS is at fault. A brief 403 HTML page from the edge right after issuance
+  is the hostname finishing activation, not the app.
 - Validate orchestration changes locally before relying on a deploy: run the unit
   tests, then boot the real thing (Caddy binary + `pip install supervisor` + the
   project venvs, `GATEWAY_APP_ROOT` pointed at a copy of the checkout, throwaway

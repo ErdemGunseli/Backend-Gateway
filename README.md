@@ -93,5 +93,5 @@ Live since 2026-09-06 on the Render service "Gateway Backend"
 (`egunseli4@gmail.com`, frankfurt, starter), hosting Heard, In-Sight and SEO Rise
 against their production databases. Reachable today by path on
 `https://backend-gateway-zyu0.onrender.com/{heard,insight,seorise}/…` (legacy
-`/in-sight`, `/seo-rise` too); the `api.<name>.erdemgunseli.com` hosts go live when
-the erdemgunseli.com zone activates on Cloudflare. `CLAUDE.md` §7–8 carry the verified state and what is left.
+`/in-sight`, `/seo-rise` too) and, since the erdemgunseli.com zone went active on
+Cloudflare the same day, at `https://api.{heard,insight,seorise}.erdemgunseli.com`. `CLAUDE.md` §7–8 carry the verified state and what is left.
