@@ -20,7 +20,7 @@ showcase projects. Serious projects graduate to their own instance.
 - **One process per project** (own interpreter + venv). Forced by the factory
   backends sharing top-level package names; also gives secret isolation,
   independent dependencies, and load isolation.
-- **Caddy** routes by Host (`<name>.api.erdemgunseli.com` plus any `extra_hosts`),
+- **Caddy** routes by Host (`api.<name>.erdemgunseli.com` plus any `extra_hosts`),
   and by path prefix (`/<name>/…`, prefix stripped) on any other host - so the
   service's own onrender.com address reaches every project before DNS exists, and
   the previous gateway's `/in-sight`, `/seo-rise` URLs keep working. Render
@@ -78,8 +78,9 @@ warns and stops.
 
 ## Resolved design decisions
 
-Domain: always `<name>.api.erdemgunseli.com` (swap never touches DNS), with
-path-prefix routing on the service's own host until that DNS exists. DB: SQLite in
+Domain: `api.<name>.erdemgunseli.com`, one DNS-only CNAME per project on Cloudflare
+(swap never touches DNS), with path-prefix routing on the service's own host until a
+project's DNS exists. DB: SQLite in
 gateway / Postgres standalone - the three current projects keep their existing
 Postgres (`db = "external"`). Env injection: universal via supervisord +
 `launch.sh`. Entrypoint: fully per-project (no factory assumption). Resources:
@@ -92,5 +93,5 @@ Live since 2026-09-06 on the Render service "Gateway Backend"
 (`egunseli4@gmail.com`, frankfurt, starter), hosting Heard, In-Sight and SEO Rise
 against their production databases. Reachable today by path on
 `https://backend-gateway-zyu0.onrender.com/{heard,insight,seorise}/…` (legacy
-`/in-sight`, `/seo-rise` too); the `<name>.api.erdemgunseli.com` hosts wait on DNS
-the owner controls. `CLAUDE.md` §7–8 carry the verified state and what is left.
+`/in-sight`, `/seo-rise` too); the `api.<name>.erdemgunseli.com` hosts go live when
+the erdemgunseli.com zone activates on Cloudflare. `CLAUDE.md` §7–8 carry the verified state and what is left.

@@ -43,16 +43,17 @@ python tools/gateway_cli.py up --account gateway
    service it instead **reconciles** `branch`, `autoDeploy=no` and the health path
    to the manifest's expectations and prints what it changed.
 2. Push every local `secrets/<name>.env` as a Render Secret File.
-3. Register the custom domains `api.<base>` **and** `*.api.<base>` (the wildcard
-   needs its parent pointing at Render too).
+3. Register each project's hostname (`host_template`, i.e. `api.<name>.<base>`) as a
+   custom domain. `extra_hosts` are never added automatically - a product's own API
+   domain may still be registered on another service; move it with
+   `gateway domains --remove` / `--add` deliberately.
 4. Trigger a deploy and wait for it to go `live`, then print the per-project URLs.
 
-Then configure **DNS** at your provider and let Render verify (auto, or force with
-`gateway domains gateway --verify '*.api.<base>'`):
-- `*.api` → `<service>.onrender.com`
-- `api`  → `<service>.onrender.com`
-- `_acme-challenge` → `<service-id>.verify.renderdns.com`
-- `_cf-custom-hostname` → `<service-id>.hostname.renderdns.com`
+Then add one **DNS-only CNAME per project** at Cloudflare (the factory's domain-ops
+tooling: `cf.py dns-upsert <zone> CNAME api.<name>.<base> <service>.onrender.com`) and
+let Render verify (auto, or force with `gateway domains --verify api.<name>.<base>`).
+No wildcard: Cloudflare's free certificate does not cover second-level names behind
+its proxy, so the records stay grey-cloud and Render issues the certificates.
 
 Flags: `--no-deploy` (provision only), `--region`, `--plan`, `--disk-gb`,
 `--secrets-dir`, `--clear-cache`.

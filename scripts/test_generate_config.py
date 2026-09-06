@@ -26,7 +26,7 @@ import generate_config as g  # noqa: E402
 MANIFEST = textwrap.dedent(
     """
     [gateway]
-    base_domain = "api.example.com"
+    base_domain = "example.com"
     service_name = "My Gateway"
     port_base = 9001
 
@@ -81,9 +81,15 @@ class ManifestTests(unittest.TestCase):
 
     def test_service_name_and_hosts(self):
         self.assertEqual(self.cfg.service_name, "My Gateway")
+        self.assertEqual(self.cfg.host_template, "api.{name}.{base_domain}")
         alpha = self.by_name["alpha"]
-        self.assertEqual(alpha.hostname, "alpha.api.example.com")
-        self.assertEqual(alpha.hosts, ("alpha.api.example.com", "api.alpha.io"))
+        self.assertEqual(alpha.hostname, "api.alpha.example.com")
+        self.assertEqual(alpha.hosts, ("api.alpha.example.com", "api.alpha.io"))
+
+    def test_host_template_override(self):
+        cfg = _load(MANIFEST.replace('port_base = 9001', 'port_base = 9001\nhost_template = "{subdomain}.api.{base_domain}"'))
+        self.assertEqual({p.name: p.hostname for p in cfg.projects},
+                         {"alpha": "alpha.api.example.com", "beta": "beta.api.example.com", "gamma": "gamma.api.example.com"})
 
     def test_ports_are_sequential_with_explicit_override(self):
         self.assertEqual(self.by_name["alpha"].port, 9001)
@@ -127,12 +133,12 @@ class GeneratorTests(unittest.TestCase):
         self.caddy = self.files["Caddyfile"]
 
     def test_every_project_has_a_host_block(self):
-        self.assertIn("http://alpha.api.example.com:{$PORT:10000}, http://api.alpha.io:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9001", self.caddy)
-        self.assertIn("http://beta.api.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9002", self.caddy)
-        self.assertIn("http://gamma.api.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9100", self.caddy)
+        self.assertIn("http://api.alpha.example.com:{$PORT:10000}, http://api.alpha.io:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9001", self.caddy)
+        self.assertIn("http://api.beta.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9002", self.caddy)
+        self.assertIn("http://api.gamma.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9100", self.caddy)
 
     def test_host_blocks_precede_the_catch_all(self):
-        self.assertLess(self.caddy.index("http://alpha.api.example.com"), self.caddy.index("http://:{$PORT:10000} {"))
+        self.assertLess(self.caddy.index("http://api.alpha.example.com"), self.caddy.index("http://:{$PORT:10000} {"))
 
     def test_path_prefixes_are_stripped_and_redirected(self):
         for prefix, port in (("/alpha", 9001), ("/beta", 9002), ("/old-beta", 9002)):

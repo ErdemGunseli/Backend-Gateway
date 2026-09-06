@@ -10,7 +10,7 @@
 #
 # Per-project keys (all paths relative to the submodule root unless noted):
 #   name          process/secret-file/log-prefix name; must be unique
-#   subdomain     routes <subdomain>.<base_domain> here (default: name)
+#   subdomain     value for {subdomain} in host_template (default: name)
 #   extra_hosts   additional Host names routed here (a product's own API domain)
 #   path_prefixes prefixes routed here on any Host no project claims, prefix
 #                 stripped (default ["/<name>"]; [] disables). This is how the
@@ -27,11 +27,14 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 [gateway]
-# Public base domain. Each project is reachable at <subdomain>.<base_domain>.
-# A wildcard custom domain (*.api.erdemgunseli.com) on the Render service plus
-# its parent (api.erdemgunseli.com) must both point at Render; the apex stays
-# wherever the marketing site lives.
-base_domain = "api.erdemgunseli.com"
+# Public base domain and how each project's API hostname is formed from it.
+# Factory convention (owner, 2026-09-06): a project's frontend lives at
+# <project>.<base_domain> and its API at api.<project>.<base_domain>, so the two
+# share a project-specific parent (cookies scope to it) and graduating to a real
+# domain is a suffix swap. One DNS-only CNAME per project points the API host at
+# this service; Render routes each hostname to the service that registered it.
+base_domain   = "erdemgunseli.com"
+host_template = "api.{name}.{base_domain}"
 
 # The Render web service that runs this gateway (default for the CLI's --service).
 service_name = "Gateway Backend"
@@ -54,8 +57,7 @@ secrets_dir = "/etc/secrets"
 # product's API domain is moved onto the gateway.
 [[project]]
 name         = "heard"
-subdomain    = "heard"              # -> heard.api.erdemgunseli.com
-extra_hosts  = ["api.heard.cc"]     # the product's own API domain, once moved here
+extra_hosts  = ["api.heard.cc"]     # -> api.heard.erdemgunseli.com, plus the product's own API domain once moved here
 path_prefixes = ["/heard"]
 path         = "projects/heard"
 backend_dir  = "fastapi_backend"
@@ -74,8 +76,7 @@ enabled      = true
 # (DATABASE_URL + SCHEMA in its secret file), exactly as the previous gateway ran it.
 [[project]]
 name         = "insight"
-subdomain    = "insight"            # -> insight.api.erdemgunseli.com (the extension's BASE_URL)
-extra_hosts  = ["api.in-sight.ai"]
+extra_hosts  = ["api.in-sight.ai"]  # -> api.insight.erdemgunseli.com (the extension's BASE_URL)
 path_prefixes = ["/insight", "/in-sight"]   # /in-sight: the previous gateway's URL
 path         = "projects/insight"
 backend_dir  = "."
@@ -89,9 +90,9 @@ enabled      = true
 
 # ─── SEO Rise ────────────────────────────────────────────────────────────────
 # Same package layout as In-Sight; data in "Gateway DB" under schema `seo_rise`.
+# -> api.seorise.erdemgunseli.com
 [[project]]
 name         = "seorise"
-subdomain    = "seorise"            # -> seorise.api.erdemgunseli.com
 path_prefixes = ["/seorise", "/seo-rise"]   # /seo-rise: the previous gateway's URL
 path         = "projects/seorise"
 backend_dir  = "."

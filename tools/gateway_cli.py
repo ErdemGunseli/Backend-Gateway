@@ -272,8 +272,9 @@ def _manifest():
     return mf.load()
 
 
-def _gateway_health_url(cfg) -> str:
-    return f"https://{cfg.base_domain}/__gateway/health"
+def _gateway_health_url(svc: dict) -> str:
+    """Gateway liveness on the service's own Render host (works before any DNS exists)."""
+    return f"{svc.get('serviceDetails', {}).get('url', '').rstrip('/')}/__gateway/health"
 
 
 def _default_service() -> str:
@@ -343,14 +344,16 @@ def cmd_up(args) -> None:
             print(f"  (no local secret file for {p.name} at {local}; skipping)")
     print(f"Secret files pushed: {pushed}/{len(cfg.projects)}")
 
-    # Custom domains: the wildcard + its parent cover every <name>.<base_domain>.
+    # Custom domains: one per project (its primary hostname). extra_hosts are a
+    # product's own API domain, which may still be registered on another service,
+    # so they are never added here - `gateway domains --add` moves them deliberately.
     existing = {d.get("name") for d in c.list_custom_domains(sid)}
-    for domain in (cfg.base_domain, f"*.{cfg.base_domain}"):
-        if domain in existing:
-            print(f"  domain {domain} already registered")
+    for p in cfg.projects:
+        if p.hostname in existing:
+            print(f"  domain {p.hostname} already registered")
         else:
-            c.add_custom_domain(sid, domain)
-            print(f"  added custom domain {domain} (configure DNS, then it auto-verifies)")
+            c.add_custom_domain(sid, p.hostname)
+            print(f"  added custom domain {p.hostname} (CNAME it to the service host; Render then verifies)")
 
     if args.no_deploy:
         print("Skipping deploy (--no-deploy). Service is provisioned.")
@@ -361,7 +364,7 @@ def cmd_up(args) -> None:
     print(f"Deploy {status.upper()}")
     if status not in {"live"}:
         sys.exit(1)
-    print(f"\nGateway is live. Health: {_gateway_health_url(cfg)}")
+    print(f"\nGateway is live. Health: {_gateway_health_url(svc)}")
     print("Per-project URLs:")
     for p in cfg.projects:
         print(f"  https://{p.hostname}{p.health_path}")
@@ -384,7 +387,7 @@ def cmd_status(args) -> None:
     for d in c.list_custom_domains(sid):
         print(f"  {d.get('name'):40s} {d.get('verificationStatus', '?')}")
     print(f"secrets : {sorted(f.get('name') for f in c.list_secret_files(sid))}")
-    print(f"health  : {_gateway_health_url(cfg)}")
+    print(f"health  : {_gateway_health_url(svc)}")
 
 
 def cmd_domains(args) -> None:
@@ -504,7 +507,7 @@ def cmd_migrate(args) -> None:
 
     if "domains" in stages:
         # A domain lives on one service at a time: remove from source first.
-        for domain in (f"*.{cfg.base_domain}", cfg.base_domain):
+        for domain in [p.hostname for p in cfg.projects]:
             try:
                 src.delete_custom_domain(src_svc["id"], domain)
                 print(f"[domains] removed {domain} from source")
@@ -512,13 +515,13 @@ def cmd_migrate(args) -> None:
                 print(f"[domains] source remove {domain}: {e} (continuing)")
             dst.add_custom_domain(dst_svc["id"], domain)
             print(f"[domains] added {domain} to dest")
-        print("[domains] ACTION REQUIRED: point DNS (CNAME *.api + parent, and "
-              "_acme-challenge) at the DEST service, then run: "
-              f"gateway domains {args.service} --account {args.dst} --verify '*.{cfg.base_domain}'")
+        print("[domains] ACTION REQUIRED: repoint each project's CNAME at the DEST service host, "
+              f"then run: gateway domains {args.service} --account {args.dst} --verify <hostname>")
 
     if "finalize" in stages:
-        if not _wait_healthy(_gateway_health_url(cfg), args.timeout):
-            sys.exit(f"[finalize] dest not healthy at {_gateway_health_url(cfg)} within {args.timeout}s; "
+        dst_svc = dst.get_service(dst_svc["id"])
+        if not _wait_healthy(_gateway_health_url(dst_svc), args.timeout):
+            sys.exit(f"[finalize] dest not healthy at {_gateway_health_url(dst_svc)} within {args.timeout}s; "
                      "NOT suspending source (investigate / roll back DNS)")
         print("[finalize] dest healthy; suspending source (kept for rollback, not deleted)")
         src.suspend(src_svc["id"])

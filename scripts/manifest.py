@@ -27,7 +27,7 @@ MANIFEST_PATH = os.environ.get("GATEWAY_MANIFEST", posixpath.join(APP_ROOT, "gat
 class Project:
     name: str
     subdomain: str
-    hostname: str          # <subdomain>.<base_domain>
+    hostname: str          # host_template rendered, e.g. api.<name>.<base_domain>
     hosts: tuple[str, ...] # every Host name routed here: hostname + extra_hosts
     path_prefixes: tuple[str, ...]  # prefixes routed here on any other host ("" = none)
     port: int              # internal localhost port
@@ -46,6 +46,7 @@ class Project:
 @dataclass(frozen=True)
 class GatewayConfig:
     base_domain: str
+    host_template: str     # e.g. "api.{name}.{base_domain}"
     port_base: int
     data_dir: str
     secrets_dir: str
@@ -74,6 +75,10 @@ def load(path: str | None = None) -> GatewayConfig:
 
     g = raw.get("gateway", {})
     base_domain = g["base_domain"]
+    # How a project's primary hostname is formed. Placeholders: {name}, {subdomain},
+    # {base_domain}. The factory default is api.<project>.<base_domain>, so a project's
+    # frontend at <project>.<base_domain> and its API share a project-specific parent.
+    host_template = g.get("host_template", "api.{name}.{base_domain}")
     port_base = int(g.get("port_base", 8001))
     data_dir = g.get("data_dir", "/data")
     secrets_dir = g.get("secrets_dir", "/etc/secrets")
@@ -101,7 +106,7 @@ def load(path: str | None = None) -> GatewayConfig:
         backend_dir = submodule_path if backend_dir_rel == "." else _abs(entry["path"], backend_dir_rel)
         requirements = posixpath.join(backend_dir, entry.get("requirements", "requirements.txt"))
 
-        hostname = f"{subdomain}.{base_domain}"
+        hostname = host_template.format(name=name, subdomain=subdomain, base_domain=base_domain).lower()
         hosts = (hostname, *[h.strip().lower() for h in entry.get("extra_hosts", []) if h.strip()])
         for h in hosts:
             if h in seen_hosts:
@@ -141,6 +146,7 @@ def load(path: str | None = None) -> GatewayConfig:
 
     return GatewayConfig(
         base_domain=base_domain,
+        host_template=host_template,
         port_base=port_base,
         data_dir=data_dir,
         secrets_dir=secrets_dir,

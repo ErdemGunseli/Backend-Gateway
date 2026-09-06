@@ -25,9 +25,9 @@ project processes. A declarative manifest (`gateway.toml`) drives everything.
 ```
             Render Web Service "Gateway Backend" (Starter, always-on, frankfurt)
    Internet ─► Caddy  (binds $PORT - the only public port; routes by Host, else by path)
-                 ├─► 127.0.0.1:8001  uvicorn  heard    (own venv, own .env, Heard DB)
-                 ├─► 127.0.0.1:8002  uvicorn  insight  (own venv, own .env, Gateway DB schema in_sight)
-                 └─► 127.0.0.1:8003  uvicorn  seorise  (own venv, own .env, Gateway DB schema seo_rise)
+                 ├─► 127.0.0.1:8001  uvicorn  heard    api.heard.erdemgunseli.com    (own venv, own .env, Heard DB)
+                 ├─► 127.0.0.1:8002  uvicorn  insight  api.insight.erdemgunseli.com  (own venv, own .env, Gateway DB schema in_sight)
+                 └─► 127.0.0.1:8003  uvicorn  seorise  api.seorise.erdemgunseli.com  (own venv, own .env, Gateway DB schema seo_rise)
               supervisord: supervises Caddy + one process per project
               secrets: /etc/secrets/<name>.env   (Render Secret Files, one per project)
               data:    the project's own Postgres (db = "external"), or /data/<name>.db (db = "sqlite")
@@ -100,8 +100,9 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
   startup (Heard: `create_and_migrate`; In-Sight/SEO Rise: `create_all`), serves on
   its internal port → Caddy routes.
 - **Routing, two layers, both generated from the manifest:**
-  1. **Host routing** (the design): each project owns `<subdomain>.<base_domain>`
-     plus any `extra_hosts` (a product's own API domain, e.g. `api.heard.cc`).
+  1. **Host routing** (the design): each project owns the hostname the manifest's
+     `host_template` renders - `api.<name>.erdemgunseli.com` - plus any
+     `extra_hosts` (a product's own API domain, e.g. `api.heard.cc`).
   2. **Path-prefix routing** on any other Host: `/<name>/…` (plus legacy aliases
      such as `/in-sight`, `/seo-rise`) is stripped and proxied to the project. This
      is how the service's own `backend-gateway-zyu0.onrender.com` address reaches
@@ -132,7 +133,7 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
 
 | Topic | Decision |
 |---|---|
-| Routing | Always `<name>.api.erdemgunseli.com`. Wildcard `*.api…` + parent `api…` point to Render; the apex stays on Vercel. Swaps never touch DNS. **Until that DNS exists**, path-prefix routing on the service's own host is the access path (added 2026-09-06; it stays as the alias layer afterwards). |
+| Routing | **`api.<name>.erdemgunseli.com`** (owner, 2026-09-06, replacing the earlier `<name>.api…` wildcard plan). The factory convention is frontend at `<project>.erdemgunseli.com`, API at `api.<project>.erdemgunseli.com`: the two share a project-specific parent (cookies scope to it, never to the shared apex) and graduating to a real domain (`heard.cc` / `api.heard.cc`) is a suffix swap. One DNS-only CNAME per project on Cloudflare points the API host at this service; no wildcard. Render's edge routes each hostname to whichever service registered it, so swaps never touch DNS. Path-prefix routing on the service's own host is the access path until a project's DNS exists and stays as the alias layer afterwards. |
 | Process model | One process per project, own venv. Forced by package-name collision. |
 | Reverse proxy | Caddy on `$PORT`, Host-routing, no TLS (Render terminates). |
 | Process mgr | supervisord; `autorestart` gives startup isolation. |
@@ -194,11 +195,11 @@ types if it uses SQLite; a fast dependency-free health endpoint.
 from this repo, hosting all three projects, each against its real production
 database. Access paths today:
 
-| Project | Path on the service host (works now) | Host-routed (needs DNS, §8) | Extra host (ready in Caddy) |
+| Project | Path on the service host (works now) | Host-routed (live once the zone activates, §8) | Extra host (ready in Caddy) |
 |---|---|---|---|
-| heard | `https://backend-gateway-zyu0.onrender.com/heard/…` | `heard.api.erdemgunseli.com` | `api.heard.cc` (still on the standalone Heard Backend) |
-| insight | `…/insight/…` and the legacy `…/in-sight/…` | `insight.api.erdemgunseli.com` (the extension's `BASE_URL`) | `api.in-sight.ai` (no DNS record exists) |
-| seorise | `…/seorise/…` and the legacy `…/seo-rise/…` | `seorise.api.erdemgunseli.com` | - |
+| heard | `https://backend-gateway-zyu0.onrender.com/heard/…` | `api.heard.erdemgunseli.com` | `api.heard.cc` (still on the standalone Heard Backend) |
+| insight | `…/insight/…` and the legacy `…/in-sight/…` | `api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `api.in-sight.ai` (no DNS record exists) |
+| seorise | `…/seorise/…` and the legacy `…/seo-rise/…` | `api.seorise.erdemgunseli.com` | - |
 
 **Validated locally before deploy** (real Caddy 2.10 + supervisord 4.2.5 + the
 three venvs, throwaway SQLite secrets): Host routing for every host incl. extra
@@ -216,13 +217,14 @@ a 512 MB instance - the headroom is thin; see §8.
 
 ## 8. Remaining work
 
-1. **DNS for `*.api.erdemgunseli.com`** - `erdemgunseli.com` is on GoDaddy DNS
-   (`ns27/ns28.domaincontrol.com`), which no credential in the factory reaches.
-   Owner action: add `CNAME *.api → backend-gateway-zyu0.onrender.com`, `CNAME api →
-   backend-gateway-zyu0.onrender.com`, then `gateway domains --add 'api.erdemgunseli.com'`
-   and `--add '*.api.erdemgunseli.com'` (Render then verifies and issues certs; the
-   `_acme-challenge` record it asks for goes in as well). The In-Sight extension
-   already points at `insight.api.erdemgunseli.com` and is dead until this lands.
+1. **erdemgunseli.com moves to Cloudflare** (owner agreed 2026-09-06). The zone
+   exists on the factory's Cloudflare account (pending, nameservers
+   `jeff`/`savanna.ns.cloudflare.com`) with the three `api.<name>` CNAMEs already
+   staged, DNS-only, and the three hostnames are registered on the Render service.
+   Owner action: switch the nameservers at GoDaddy (runbook handed over on
+   2026-09-06), then the registrar transfer at their pace. Once the zone is active,
+   verify each host answers 200 over HTTPS and update the ledger. The In-Sight
+   extension points at `api.insight.erdemgunseli.com` and comes back to life then.
 2. **Move `api.heard.cc` onto the gateway** (then suspend the standalone "Heard
    Backend"): `gateway domains "Heard Backend" --remove api.heard.cc` then `gateway
    domains --add api.heard.cc`. Its DNS CNAME already points at Render (at a
@@ -242,6 +244,10 @@ a 512 MB instance - the headroom is thin; see §8.
    commit, `gateway deploy --wait`).
 6. **Point the service at `main`** once this branch merges (`gateway up` reconciles
    `branch`); it currently deploys `claude/gateway-setup-integration-q2gen4`.
+7. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
+   instances without a bought domain; nothing points there yet (Heard is on
+   `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
+   Vercel per project when wanted.
 
 ---
 
