@@ -277,6 +277,12 @@ Kept for the record; nothing here is pending.
 - Risky/stateful operations (Render API, data pump) stay as **deterministic,
   idempotent** scripts; the agent skill orchestrates them. Never half-complete a
   swap - if a required API key is missing, warn and stop.
+- **Binaries with file capabilities do not exec on Render.** The official Caddy
+  image ships `/usr/bin/caddy` with `cap_net_bind_service` set; copied as-is,
+  supervisord got `EPERM` on every spawn and the deploy failed its port scan while
+  every project process was already up (2026-09-06). The Dockerfile re-copies the
+  binary with plain `cp` to drop the xattr. Apply the same to any other binary
+  lifted from a vendor image.
 - Validate orchestration changes locally before relying on a deploy: run the unit
   tests, then boot the real thing (Caddy binary + `pip install supervisor` + the
   project venvs, `GATEWAY_APP_ROOT` pointed at a copy of the checkout, throwaway

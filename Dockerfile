@@ -10,7 +10,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends supervisor bash ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
+# The official image marks its binary with the cap_net_bind_service file capability.
+# Render's unprivileged runtime refuses to exec a binary carrying file capabilities
+# (supervisord logged "couldn't exec caddy: EPERM" on the first deploy, 2026-09-06),
+# and Caddy binds an unprivileged port anyway - so re-copy it with plain `cp`, which
+# drops the security.capability xattr and leaves an ordinary executable behind.
+COPY --from=caddy /usr/bin/caddy /tmp/caddy-with-caps
+RUN cp /tmp/caddy-with-caps /usr/bin/caddy && chmod 0755 /usr/bin/caddy && rm /tmp/caddy-with-caps
 
 ENV GATEWAY_APP_ROOT=/app \
     GATEWAY_GEN_DIR=/app/generated \
