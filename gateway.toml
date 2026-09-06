@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Gateway manifest — the single source of truth for every hosted project.
+#
+# `scripts/generate_config.py` renders the Caddyfile, the supervisord program
+# definitions, and a per-project runspec from this file. Onboarding a project is:
+#   1. add it as a git submodule under projects/<name>
+#   2. create its Render Secret File  (<name>.env)  — `gateway secrets-push`
+#   3. add a [[project]] block here
+#   4. `gateway deploy --wait`
+#
+# Per-project keys (all paths relative to the submodule root unless noted):
+#   name          process/secret-file/log-prefix name; must be unique
+#   subdomain     routes <subdomain>.<base_domain> here (default: name)
+#   extra_hosts   additional Host names routed here (a product's own API domain)
+#   path_prefixes prefixes routed here on any Host no project claims, prefix
+#                 stripped (default ["/<name>"]; [] disables). This is how the
+#                 service's own onrender.com address reaches a project before the
+#                 custom domains resolve, and how legacy URLs keep working.
+#   path          submodule path;  backend_dir  dir holding the app (relative)
+#   app           ASGI target module:attr, imported from backend_dir
+#   requirements  relative to backend_dir;  workers  process worker count
+#   health_path   the project's fast dependency-free health route
+#   db            "sqlite" (gateway owns DATABASE_URL, file under data_dir) or
+#                 "external" (DATABASE_URL comes from the project's secret file)
+#   start_cmd     optional explicit command (may use $PROJECT_PORT etc.);
+#                 default is gunicorn+UvicornWorker, or uvicorn if only that ships
+# ─────────────────────────────────────────────────────────────────────────────
+
+[gateway]
+# Public base domain. Each project is reachable at <subdomain>.<base_domain>.
+# A wildcard custom domain (*.api.erdemgunseli.com) on the Render service plus
+# its parent (api.erdemgunseli.com) must both point at Render; the apex stays
+# wherever the marketing site lives.
+base_domain = "api.erdemgunseli.com"
+
+# The Render web service that runs this gateway (default for the CLI's --service).
+service_name = "Gateway Backend"
+
+# First internal port; projects without an explicit `port` are assigned
+# sequentially from here. Only Caddy is exposed publicly (on Render's $PORT).
+port_base = 8001
+
+# Persistent-disk mount holding one SQLite file per sqlite-backed project.
+data_dir = "/data"
+
+# Where Render mounts per-project Secret Files (<name>.env).
+secrets_dir = "/etc/secrets"
+
+
+# ─── Heard ───────────────────────────────────────────────────────────────────
+# Factory-style layout (backend under fastapi_backend/, absolute imports, its own
+# /healthz). Runs against its existing Postgres ("Heard DB") via the secret file,
+# so the standalone service and the gateway serve the same data until the
+# product's API domain is moved onto the gateway.
+[[project]]
+name         = "heard"
+subdomain    = "heard"              # -> heard.api.erdemgunseli.com
+extra_hosts  = ["api.heard.cc"]     # the product's own API domain, once moved here
+path_prefixes = ["/heard"]
+path         = "projects/heard"
+backend_dir  = "fastapi_backend"
+app          = "main:app"
+requirements = "requirements.txt"
+workers      = 1
+health_path  = "/healthz"
+db           = "external"
+enabled      = true
+
+
+# ─── In-Sight ────────────────────────────────────────────────────────────────
+# Package layout with relative imports: imported as fastapi_backend.main from the
+# submodule root. Ships uvicorn only (no gunicorn), so the launcher runs uvicorn.
+# Data lives in the shared "Gateway DB" Postgres under schema `in_sight`
+# (DATABASE_URL + SCHEMA in its secret file), exactly as the previous gateway ran it.
+[[project]]
+name         = "insight"
+subdomain    = "insight"            # -> insight.api.erdemgunseli.com (the extension's BASE_URL)
+extra_hosts  = ["api.in-sight.ai"]
+path_prefixes = ["/insight", "/in-sight"]   # /in-sight: the previous gateway's URL
+path         = "projects/insight"
+backend_dir  = "."
+app          = "fastapi_backend.main:app"
+requirements = "fastapi_backend/requirements.txt"
+workers      = 1
+health_path  = "/"
+db           = "external"
+enabled      = true
+
+
+# ─── SEO Rise ────────────────────────────────────────────────────────────────
+# Same package layout as In-Sight; data in "Gateway DB" under schema `seo_rise`.
+[[project]]
+name         = "seorise"
+subdomain    = "seorise"            # -> seorise.api.erdemgunseli.com
+path_prefixes = ["/seorise", "/seo-rise"]   # /seo-rise: the previous gateway's URL
+path         = "projects/seorise"
+backend_dir  = "."
+app          = "fastapi_backend.main:app"
+requirements = "fastapi_backend/requirements.txt"
+workers      = 1
+health_path  = "/"
+db           = "external"
+enabled      = true

@@ -1,9 +1,12 @@
-[submodule "seo_rise"]
-	path = seo_rise
-	url = https://github.com/ErdemGunseli/SEORise
-[submodule "heard"]
-	path = heard
+[submodule "projects/heard"]
+	path = projects/heard
 	url = https://github.com/ErdemGunseli/Heard
-[submodule "in_sight"]
-	path = in_sight
+	branch = main
+[submodule "projects/insight"]
+	path = projects/insight
 	url = https://github.com/ErdemGunseli/In-Sight-AI
+	branch = main
+[submodule "projects/seorise"]
+	path = projects/seorise
+	url = https://github.com/ErdemGunseli/SEORise
+	branch = main

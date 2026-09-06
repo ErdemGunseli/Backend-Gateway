@@ -1,0 +1,6 @@
+# Gateway orchestration tooling (build-time + swap CLI).
+# NOTE: each hosted project has its own venv with its own dependencies; this file
+# is only for the gateway's own scripts. The data pump (db_pump.py) runs inside a
+# project's venv, so SQLAlchemy is intentionally NOT pinned here.
+requests==2.32.3
+tomlkit==0.13.2

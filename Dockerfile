@@ -1,39 +1,37 @@
+# syntax=docker/dockerfile:1
+
+# Caddy binary lifted from the official image (no apt repo dance).
+FROM caddy:2 AS caddy
+
 FROM python:3.11-slim
 
+# supervisord (process manager) + bash (launch.sh) + curl (health probes).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends supervisor bash ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
+
+ENV GATEWAY_APP_ROOT=/app \
+    GATEWAY_GEN_DIR=/app/generated \
+    PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# Submodules need to be loaded on hosting via pre-deploy command
+# Bring in the orchestrator (manifest, scripts, tooling) and the project code,
+# which arrives as git submodules under projects/<name> (Render checks them out
+# before the build). Frontends and other non-backend trees are excluded by
+# .dockerignore so the image only carries what the processes need.
+COPY . /app
 
-# Copying gateway entrypoint:
-COPY main.py .
+RUN chmod +x scripts/launch.sh entrypoint.sh
 
-# Copying backend source code:
-COPY seo_rise/fastapi_backend/ seo_rise/fastapi_backend/
-COPY in_sight/fastapi_backend/ in_sight/fastapi_backend/
-COPY heard/fastapi_backend/    heard/fastapi_backend/
+# One venv per project (reads the manifest). Kept as its own layer so it only
+# re-runs when project requirements change.
+RUN python scripts/build_venvs.py
 
-# Creating project root __init__.py files, enabling python imports without cluttering source code:
-RUN echo "# Generated for Python imports - SEO Rise package" > seo_rise/__init__.py
-RUN echo "# Generated for Python imports - In-Sight package" > in_sight/__init__.py  
-RUN echo "# Generated for Python imports - Heard package" > heard/__init__.py
+# Pre-generate config (also regenerated at boot by the entrypoint).
+RUN python scripts/generate_config.py
 
-# Creating fastapi_backend __init__.py files to expose apps (no source code requirements):
-RUN echo "from .main import app" > seo_rise/fastapi_backend/__init__.py
-RUN echo "from .main import app" > in_sight/fastapi_backend/__init__.py
-RUN echo "from .main import app" > heard/fastapi_backend/__init__.py
-
-# Copying requirement files:
-COPY seo_rise/fastapi_backend/requirements.txt   requirements-seo.txt
-COPY in_sight/fastapi_backend/requirements.txt   requirements-insight.txt
-COPY heard/fastapi_backend/requirements.txt      requirements-heard.txt
-
-# Installing dependencies:
-RUN pip install --no-cache-dir -r requirements-seo.txt \
- && pip install --no-cache-dir -r requirements-insight.txt \
- && pip install --no-cache-dir -r requirements-heard.txt
-
-# Exposing port:
+# Only Caddy is public; it binds Render's injected $PORT (default 10000).
 EXPOSE 10000
-
-# Starting the gateway app:
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
+ENTRYPOINT ["/app/entrypoint.sh"]
