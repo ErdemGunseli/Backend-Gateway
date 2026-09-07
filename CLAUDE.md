@@ -138,7 +138,7 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
 | Reverse proxy | Caddy on `$PORT`, Host-routing, no TLS (Render terminates). |
 | Process mgr | supervisord; `autorestart` gives startup isolation. |
 | Secrets | Render Secret Files, one per project; injected into only that process by `launch.sh`. Logical isolation (not hardened vs same-UID). Service-level env vars are inherited by every process, so nothing project-specific ever goes there. |
-| Database | **In gateway = SQLite** (file on persistent disk) for new/low-value projects; **standalone = Postgres**. The three current projects run `db = "external"` against the Postgres they already had (Heard DB; Gateway DB schemas `in_sight` / `seo_rise`) - zero data migration, and Heard's standalone service can keep serving the same data until its domain moves (2026-09-06). |
+| Database | **In gateway = SQLite** (file on persistent disk) for new/low-value projects; **standalone = Postgres**. The three current projects run `db = "external"` against Postgres: Heard against **Heard DB** (the same database its standalone service always used - nothing to migrate), In-Sight and SEO Rise against **Gateway DB** schemas `in_sight` / `seo_rise`. The last two needed a real data migration on 2026-09-07 - see §7. |
 | Hosting service | The pre-existing Render service **"Gateway Backend"** (`srv-d28cecuuk2gs73f5b5qg`, `egunseli4@gmail.com`, frankfurt, starter) was reused - same account and region as the projects' Postgres instances, which are reachable only by their internal hostnames. No persistent disk attached (no sqlite projects yet). |
 | Env injection | Universal via supervisord + `launch.sh` (works for any app, not just `load_dotenv`). |
 | Entrypoint | **Factory layout NOT assumed** - `backend_dir`, `app`, `start_cmd` are per-project in the manifest. |
@@ -195,11 +195,16 @@ types if it uses SQLite; a fast dependency-free health endpoint.
 from this repo, hosting all three projects, each against its real production
 database. Access paths today:
 
-| Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Extra host (ready in Caddy) |
+| Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Product's own API domain |
 |---|---|---|---|
-| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | `api.heard.cc` (still on the standalone Heard Backend) |
-| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` (no DNS record exists) |
+| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | **`api.heard.cc` - moved onto the gateway 2026-09-07**; heard.cc's frontend calls it |
+| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` registered here 2026-09-07, but no DNS record for it exists |
 | seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - |
+
+**Every standalone service is suspended (2026-09-07)** - Heard Backend, In-Sight AI Backend
+and SEO Rise Backend - so the gateway is the only thing serving these products. Their two
+stale databases are suspended but kept as the rollback. Full evidence, including the
+account migration that turned out to be necessary, is in `verification/2026-09-07/`.
 
 Host routing was verified live the same day: `/healthz` or `/`, `/docs` with its spec,
 and a DB-backed login lookup on each of the three hosts, from this environment and
@@ -214,8 +219,21 @@ hosts (200), path-prefix routing incl. legacy aliases (200), bare prefix → 308
 idle: **~385 MB PSS total** (heard ~129, seorise ~110, insight ~90, caddy ~27) on
 a 512 MB instance - the headroom is thin; see §8.
 
+**The database migration (2026-09-07).** The note that once stood here - that the
+standalone In-Sight / SEO Rise databases were stale copies of what Gateway DB already held
+- was **wrong when measured**. In-Sight's `in_sight` schema was empty (every account lived
+only on the standalone database) and SEO Rise's held only its 2026 accounts, with 30 older
+ones stranded on the standalone. Both were migrated in additively (4 users + 19 messages;
+30 users, 42 conversations, 206 messages, 102 function calls, 1 contact), de-duplicating
+by email and remapping primary keys, and then proven through the public API. Never assume a
+sibling database is a copy - count the rows. Method, dry-run discipline, the two defects the
+dry runs caught, and rollback: `verification/2026-09-07/`.
+
 **Not exercised yet:** a real SQLite project on a persistent disk, a live
-`db_pump` swap, and `gateway migrate` (all need a case to arise).
+`db_pump` swap, and `gateway migrate` (all need a case to arise). Note that
+`db_pump.py` was NOT the tool used above - it needs the project's own models and a
+reachable database, and this environment cannot open port 5432; the migration ran as a
+Render one-off job instead.
 
 ---
 
@@ -229,20 +247,17 @@ a 512 MB instance - the headroom is thin; see §8.
    registrar lock and DNSSEC. The In-Sight extension points at
    `api.insight.erdemgunseli.com`, which now resolves; a store release is what
    ships it to users.
-2. **Move `api.heard.cc` onto the gateway** (then suspend the standalone "Heard
-   Backend"): `gateway domains "Heard Backend" --remove api.heard.cc` then `gateway
-   domains --add api.heard.cc`. Its DNS CNAME already points at Render (at a
-   long-gone `gateway-e0z6.onrender.com` host, which Render's edge still accepts),
-   so no registrar change is needed - but this is a live cutover of Heard's
-   production API and its TLS cert is re-issued, so do it with the owner's go-ahead
-   in a quiet window. Data is shared already (both read Heard DB).
+2. ~~Move `api.heard.cc` onto the gateway~~ **done 2026-09-07** - moved with the owner's
+   go-ahead; the certificate issued in under a minute and heard.cc's frontend, which calls
+   that host, was verified afterwards.
 3. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
    joins, either trim its dependencies (the QUANTSOC lesson: the big SDKs - openai,
    anthropic, boto3 - are the cost) or upgrade the plan; both are owner calls.
-4. **Retire the standalone In-Sight / SEO Rise services and their suspended
-   Postgres instances** on `egunseli4@gmail.com` once the owner confirms nothing
-   else reads them (their data was already in Gateway DB under the previous
-   gateway; the suspended DBs are stale copies).
+4. **Delete the three suspended standalone services and the two suspended databases**
+   once the owner is satisfied with the cutover. They are the rollback and cost nothing
+   suspended, so there is no hurry - but note their databases are NOT redundant copies:
+   their contents were migrated into Gateway DB on 2026-09-07, so deleting them discards
+   the only second copy of those rows. Take a dump first if that matters.
 5. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
