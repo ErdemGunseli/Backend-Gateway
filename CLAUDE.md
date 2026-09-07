@@ -138,7 +138,7 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
 | Reverse proxy | Caddy on `$PORT`, Host-routing, no TLS (Render terminates). |
 | Process mgr | supervisord; `autorestart` gives startup isolation. |
 | Secrets | Render Secret Files, one per project; injected into only that process by `launch.sh`. Logical isolation (not hardened vs same-UID). Service-level env vars are inherited by every process, so nothing project-specific ever goes there. |
-| Database | **In gateway = SQLite** (file on persistent disk) for new/low-value projects; **standalone = Postgres**. The three current projects run `db = "external"` against Postgres: Heard against **Heard DB** (the same database its standalone service always used - nothing to migrate), In-Sight and SEO Rise against **Gateway DB** schemas `in_sight` / `seo_rise`. The last two needed a real data migration on 2026-09-07 - see §7. |
+| Database | **SQLite is the default; Postgres is the exception** - see §10 for the conditions, the readiness gate and the conversion. A managed Postgres costs more per month than the whole instance it hangs off, so a project keeps one only by failing a stated condition. The three current projects still run `db = "external"` against Postgres (Heard against **Heard DB**; In-Sight and SEO Rise against **Gateway DB** schemas `in_sight` / `seo_rise`) - measured SQLite-ready on 2026-09-07 but not yet converted, because converting needs a disk, a backup mechanism and the owner's go-ahead. |
 | Hosting service | The pre-existing Render service **"Gateway Backend"** (`srv-d28cecuuk2gs73f5b5qg`, `egunseli4@gmail.com`, frankfurt, starter) was reused - same account and region as the projects' Postgres instances, which are reachable only by their internal hostnames. No persistent disk attached (no sqlite projects yet). |
 | Env injection | Universal via supervisord + `launch.sh` (works for any app, not just `load_dotenv`). |
 | Entrypoint | **Factory layout NOT assumed** - `backend_dir`, `app`, `start_cmd` are per-project in the manifest. |
@@ -165,6 +165,8 @@ scripts/
   build_venvs.py          one venv per project (build time)
   launch.sh               per-project launcher (secret injection, runner choice, log prefix)
   test_generate_config.py unit tests for the loader + generator (`python -m unittest scripts/test_generate_config.py`)
+  sqlite_readiness.sh     boots the real stack on SQLite and exercises register/login
+                          per project - the gate a project passes before db = "sqlite" (§10)
 tools/
   render_api.py           minimal Render REST client
   db_pump.py              model-driven cross-engine data pump (PG <-> SQLite)
@@ -250,20 +252,27 @@ Render one-off job instead.
 2. ~~Move `api.heard.cc` onto the gateway~~ **done 2026-09-07** - moved with the owner's
    go-ahead; the certificate issued in under a minute and heard.cc's frontend, which calls
    that host, was verified afterwards.
-3. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
+3. **Convert the three projects to SQLite and retire both Postgres instances** (§10).
+   All three were measured SQLite-ready on 2026-09-07 and their data is tiny (Heard
+   9.7 MB / 663 rows; In-Sight 4 users; SEO Rise 34 users), so the two managed Postgres
+   instances are now the bulk of the running cost for no capability the projects use.
+   Blocked on three owner decisions, not on code: attaching the disk (which ends
+   zero-downtime deploys), replacing the managed backups Postgres was providing, and a
+   window for the cutover. This is the single biggest remaining saving.
+4. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
    joins, either trim its dependencies (the QUANTSOC lesson: the big SDKs - openai,
    anthropic, boto3 - are the cost) or upgrade the plan; both are owner calls.
-4. **Delete the three suspended standalone services and the two suspended databases**
+5. **Delete the three suspended standalone services and the two suspended databases**
    once the owner is satisfied with the cutover. They are the rollback and cost nothing
    suspended, so there is no hurry - but note their databases are NOT redundant copies:
    their contents were migrated into Gateway DB on 2026-09-07, so deleting them discards
    the only second copy of those rows. Take a dump first if that matters.
-5. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
+6. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
-6. **Point the service at `main`** once this branch merges (`gateway up` reconciles
+7. **Point the service at `main`** once this branch merges (`gateway up` reconciles
    `branch`); it currently deploys `claude/gateway-setup-integration-q2gen4`.
-7. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
+8. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
    instances without a bought domain; nothing points there yet (Heard is on
    `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
    Vercel per project when wanted.
@@ -290,7 +299,79 @@ Kept for the record; nothing here is pending.
 
 ---
 
-## 10. Conventions for agents working here
+## 10. Storage policy: SQLite by default, Postgres by exception
+
+The gateway exists to run many low-traffic backends on **one** cheap always-on instance.
+A managed Postgres per project quietly undoes that - each one costs more per month than
+the instance itself - so the storage default is **SQLite on the persistent disk**, and a
+project earns a Postgres only by failing one of the conditions below.
+
+### When a project may NOT use SQLite
+
+Any one of these is enough to keep it on Postgres. Record which one applies in the
+project's `[[project]]` block, so the exception is a stated decision rather than drift:
+
+1. **It needs writers in more than one process** - `workers > 1`, a background worker, or
+   a second service reading the same data. SQLite takes one writer at a time.
+2. **It uses PostgreSQL-only storage that cannot be made portable** - `JSONB` operators
+   (not merely a JSON column), array columns, full-text search, extensions such as
+   pgvector, or SQL that names `search_path` / schemas. A *portable* equivalent is
+   usually cheap: Heard stores embeddings as a JSON list of floats and computes cosine
+   similarity in Python precisely so it does not need pgvector.
+3. **It needs managed backups or point-in-time recovery** and nothing else provides them
+   - see the backup obligation below, which is the real cost of this policy.
+4. **It is not low-traffic** - sustained write concurrency, or data heading past roughly a
+   gigabyte. For scale, the answer is graduation to its own service, not a bigger disk.
+
+Everything else is SQLite. Note what is *not* on that list: having a Postgres today is not
+a reason to keep one.
+
+### The readiness gate - run it, do not assume
+
+`scripts/sqlite_readiness.sh` boots the real gateway against throwaway SQLite files and
+exercises the write path that actually breaks: register an account, reject the duplicate,
+log in with the right password and the wrong one. Enum columns, JSON columns, timestamp
+defaults, unique constraints and cascade foreign keys all sit on that path. A project may
+not be switched to `db = "sqlite"` until it passes.
+
+Measured on 2026-09-07, all three hosted projects pass (11 of 12 probes; the twelfth is
+Heard's registration returning 500 because the local SendGrid key is a dummy - the account
+is created and logs in, so the database layer is fine). Their data is small enough that the
+question is not close: Heard 9.7 MB / 663 rows, In-Sight 4 users, SEO Rise 34 users.
+
+### The backup obligation
+
+This is what Postgres was buying, and it is not optional. Render's managed Postgres does
+daily backups and point-in-time recovery; a SQLite file on a disk does not, and the disk is
+a single point of loss. **Before real user data moves to SQLite, a project must have a
+backup that leaves the instance** - the natural fit is a periodic
+`sqlite3 <db> "VACUUM INTO '<snapshot>'"` uploaded to the org's R2 bucket, since the
+factory already holds Cloudflare credentials. A project whose data cannot be protected
+that way keeps its Postgres under condition 3.
+
+### The conversion
+
+One-time, per project, and never a silent side effect of a deploy:
+
+1. Attach the disk (`gateway up` without `--no-disk`) and confirm `data_dir` is mounted.
+   Note the cost: a Render service with a disk cannot do zero-downtime deploys, so every
+   gateway deploy becomes a short hard restart rather than a swap.
+2. Provision the schema: `gateway provision-sqlite <name>` (`create_all` + `alembic stamp
+   head`, so a Postgres-authored migration history is not replayed).
+3. Copy the data with `tools/db_pump.py`, run **in the project's own venv** so its models
+   drive the conversion, from inside the gateway container - `entrypoint.sh` runs a command
+   passed to it instead of the gateway, so a Render one-off job can do this and is the only
+   place that reaches both the project's Postgres and this disk.
+4. Verify by row count per table, and by logging in as a real migrated account through the
+   public API - not by the pump's own report.
+5. Flip `db = "external"` to `db = "sqlite"`, remove `DATABASE_URL` from the project's
+   secret file (the launcher owns it for sqlite projects), deploy, re-verify.
+6. Only then suspend the Postgres - and keep it suspended, not deleted, until the first
+   backup has been restored successfully at least once.
+
+Reverse the same way: the pump is bidirectional.
+
+## 11. Conventions for agents working here
 
 - The **manifest is the only place** you register/configure a project; never
   hand-edit generated files (`generated/*`, `run.d/*`) - they're rebuilt at boot.
