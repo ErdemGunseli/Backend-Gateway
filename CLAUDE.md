@@ -234,9 +234,12 @@ venvs, throwaway SQLite secrets): Host routing for every host incl. extra hosts 
 `/__gateway/health` 200 on all six hostnames *and* the service host, path-prefix routing
 incl. legacy aliases (200), bare prefix -> 308, `/docs` under a prefix with its spec
 routed by Referer (200), unknown host/path (404), X-Forwarded-Proto/For reaching the app
-as `scheme=https` + real client IP, graceful SIGTERM shutdown of all three. Memory idle:
-**~385 MB PSS total** (heard ~129, seorise ~110, insight ~90, caddy ~27) on a 512 MB
-instance - the headroom is thin; see §8.
+as `scheme=https` + real client IP, graceful SIGTERM shutdown of all three.
+
+**Memory, measured on the live instance** (Render's own metric, 2026-09-08 after the
+SQLite cutover): **333-349 MB of 512 MB** at idle, steady. That is below the ~385 MB PSS
+the local boot suggested, so the earlier figure was pessimistic - but the headroom is
+still under 170 MB and a fourth project would not fit without a trim; see §8.
 
 **The database migration (2026-09-07).** The note that once stood here - that the
 standalone In-Sight / SEO Rise databases were stale copies of what Gateway DB already held
@@ -273,9 +276,10 @@ which is the only place that reaches both a project's Postgres and this disk.
    the design: §10's whole backup position rests on Render snapshotting `/data` daily,
    and that has never been exercised here. Until it has, keep every suspended Postgres
    suspended rather than deleted - they are the only proven copy.
-5. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
-   joins, either trim its dependencies (the QUANTSOC lesson: the big SDKs - openai,
-   anthropic, boto3 - are the cost) or upgrade the plan; both are owner calls.
+5. **Memory headroom** - 333-349 MB idle of 512 MB, measured on the live instance
+   rather than estimated. If a project grows or a fourth joins, either trim its
+   dependencies (the QUANTSOC lesson: the big SDKs - openai, anthropic, boto3 - are the
+   cost) or upgrade the plan; both are owner calls.
 6. **Delete the suspended services and databases** once the owner is satisfied and item 4
    has been done. Three standalone services, and four databases: Heard DB, Gateway DB,
    and the two older standalone ones. They cost nothing suspended, so there is no hurry -
