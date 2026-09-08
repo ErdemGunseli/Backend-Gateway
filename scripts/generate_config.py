@@ -30,6 +30,21 @@ def _proxy(p: m.Project) -> str:
     return f"reverse_proxy 127.0.0.1:{p.port}"
 
 
+def _health(indent: str) -> list[str]:
+    # Gateway liveness. Emitted in EVERY site block, not just the catch-all:
+    # Render's health check carries a Host header of its own choosing, and when
+    # that is one of the project hostnames the request lands in that project's
+    # site block - where the app has no such route and answers 404, failing the
+    # deploy while the gateway is in fact healthy (measured 2026-09-08).
+    return [
+        f"{indent}# Gateway liveness - Caddy answers this on every Host.",
+        f"{indent}@health path /__gateway/health",
+        f"{indent}handle @health {{",
+        f'{indent}\trespond "ok" 200',
+        f"{indent}}}",
+    ]
+
+
 def _caddyfile(cfg: m.GatewayConfig) -> str:
     # Render terminates TLS at its edge and forwards plain HTTP to $PORT, so Caddy
     # serves HTTP only and routes purely by Host header. $PORT is read at runtime.
@@ -54,7 +69,10 @@ def _caddyfile(cfg: m.GatewayConfig) -> str:
         lines += [
             f"# {p.name}: Host routing",
             f"{addresses} {{",
-            f"\t{_proxy(p)}",
+            *_health("\t"),
+            "\thandle {",
+            f"\t\t{_proxy(p)}",
+            "\t}",
             "}",
             "",
         ]
@@ -63,11 +81,7 @@ def _caddyfile(cfg: m.GatewayConfig) -> str:
     lines += [
         "# Any other Host: gateway health + path-prefix routing",
         f"http://:{port} {{",
-        "\t# Gateway liveness - passes whenever Caddy is up, independent of projects.",
-        "\t@health path /__gateway/health",
-        "\thandle @health {",
-        "\t\trespond \"ok\" 200",
-        "\t}",
+        *_health("\t"),
         "",
     ]
     for p in cfg.projects:

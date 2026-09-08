@@ -133,9 +133,23 @@ class GeneratorTests(unittest.TestCase):
         self.caddy = self.files["Caddyfile"]
 
     def test_every_project_has_a_host_block(self):
-        self.assertIn("http://api.alpha.example.com:{$PORT:10000}, http://api.alpha.io:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9001", self.caddy)
-        self.assertIn("http://api.beta.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9002", self.caddy)
-        self.assertIn("http://api.gamma.example.com:{$PORT:10000} {\n\treverse_proxy 127.0.0.1:9100", self.caddy)
+        for host, port in (
+            ("http://api.alpha.example.com:{$PORT:10000}, http://api.alpha.io:{$PORT:10000}", 9001),
+            ("http://api.beta.example.com:{$PORT:10000}", 9002),
+            ("http://api.gamma.example.com:{$PORT:10000}", 9100),
+        ):
+            self.assertIn(f"{host} {{\n", self.caddy)
+            self.assertIn(f"\thandle {{\n\t\treverse_proxy 127.0.0.1:{port}\n\t}}", self.caddy)
+
+    def test_health_answers_on_every_host_not_just_the_catch_all(self):
+        # Render's health check carries a Host header of its own choosing; when that is
+        # a project's hostname, a health route only in the catch-all lets the request
+        # reach the app, which 404s and fails the deploy (measured 2026-09-08).
+        blocks = self.caddy.split("\n}\n")
+        routed = [b for b in blocks if "reverse_proxy" in b or "gateway: unknown host" in b]
+        self.assertEqual(len(routed), 4)  # three projects + the catch-all
+        for b in routed:
+            self.assertIn("@health path /__gateway/health", b)
 
     def test_host_blocks_precede_the_catch_all(self):
         self.assertLess(self.caddy.index("http://api.alpha.example.com"), self.caddy.index("http://:{$PORT:10000} {"))

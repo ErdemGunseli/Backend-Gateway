@@ -1,14 +1,22 @@
 """One-time seed of a project's SQLite database from the Postgres it used to run on.
 
-Run by `launch.sh` in the project's OWN virtualenv, from its backend directory, when a
-sqlite-backed project has no database file yet and its secret file names a source. That
-placement is not incidental: this container is the only place that can reach both a
-project's Postgres and the gateway's persistent disk.
+Run by `launch.sh` in the project's OWN virtualenv, from its backend directory, for a
+sqlite-backed project whose secret file names a source. That placement is not
+incidental: this container is the only place that can reach both a project's Postgres
+and the gateway's persistent disk.
 
 The project's own SQLAlchemy models define the target schema, so every conversion the
 engines disagree about - enums, JSON, timezone-aware timestamps, booleans - goes through
 SQLAlchemy's type system rather than string munging. The source side is reflected, so a
 column the models have since dropped does not break the copy.
+
+**Idempotent by data, not by file.** The target is created and inspected first: if it
+already holds rows, the seed is done and the source is never contacted (so a suspended
+Postgres cannot keep a converted project from booting). Only an empty target is filled.
+That is deliberate - an earlier version keyed on the database file's existence, and a
+seed that copied nothing still left a file behind, which then looked seeded forever
+(measured 2026-09-08: Heard booted on an empty database because every table lookup
+missed on a schema-qualified key).
 
 Environment:
   SEED_FROM_DATABASE_URL   source Postgres URL          (required)
@@ -19,8 +27,13 @@ Environment:
   SEED_IMPORTS             comma-separated model modules to import (default "models")
   SEED_APP                 the project's ASGI target, used only to derive the above
 
-Exits non-zero if anything fails, so the launcher can refuse to start the app on an
-empty database rather than silently serving one.
+One known, behaviour-neutral difference: a SQL NULL in a JSON column arrives as the
+JSON value `null` rather than SQL NULL, because that is how SQLAlchemy's JSON type
+binds None. Both read back through the ORM as None; only raw `IS NULL` SQL would tell
+them apart.
+
+Exits non-zero if anything fails or if the copy cannot be proven row-for-row, so the
+launcher can refuse to start the app on a database that is empty or short.
 """
 
 from __future__ import annotations
@@ -44,9 +57,9 @@ def main() -> int:
         log("SEED_FROM_DATABASE_URL is not set; nothing to seed")
         return 0
 
-    # The models must be imported with the target settings in force: SCHEMA unset (SQLite
-    # has no schemas) and DATABASE_URL already pointing at the file, because a project's
-    # database module builds its engine at import time.
+    # The models must be imported with the target settings in force: SCHEMA unset
+    # (SQLite has no schemas) and DATABASE_URL already pointing at the file, because a
+    # project's database module builds its engine at import time.
     os.environ.pop("SCHEMA", None)
     sys.path.insert(0, os.getcwd())
 
@@ -66,25 +79,41 @@ def main() -> int:
     target_md.create_all(dst)
     with dst.begin() as conn:
         conn.exec_driver_sql("PRAGMA journal_mode=WAL")
-    log("target schema created at %s (%d tables)" % (dst_url, len(target_md.sorted_tables)))
+    log("target ready at %s (%d tables)" % (dst_url, len(target_md.sorted_tables)))
+
+    # Already carrying data? Then this project has been converted; do not touch the
+    # source at all (it may be suspended by now) and let the app boot.
+    with dst.connect() as conn:
+        existing = {
+            t.name: conn.execute(select(func.count()).select_from(t)).scalar_one()
+            for t in target_md.sorted_tables
+        }
+    if any(existing.values()):
+        log("target already holds %d rows; nothing to seed" % sum(existing.values()))
+        return 0
 
     src = create_engine(src_url)
     names = [t.name for t in target_md.sorted_tables]
-    source_md = MetaData(schema=None if src_schema == "public" else src_schema)
+    # Reflect without a MetaData-level schema and key by bare table name: whether
+    # SQLAlchemy stores a reflected table as "users" or "public.users" depends on the
+    # schema arguments, and getting that wrong silently skips every table.
+    source_md = MetaData()
     source_md.reflect(src, only=lambda n, _m: n in names, schema=src_schema)
-    log("source %s reflected: %d of %d tables present" % (src_schema, len(source_md.tables), len(names)))
+    by_name = {t.name: t for t in source_md.tables.values()}
+    log("source schema %s: %d of %d tables present" % (src_schema, len(by_name), len(names)))
 
-    copied = {}
+    expected, copied = {}, {}
     with src.connect() as s_conn, dst.begin() as d_conn:
         for table in target_md.sorted_tables:  # parents before children
-            key = table.name if src_schema == "public" else "%s.%s" % (src_schema, table.name)
-            # `or` would truth-test a Table, which SQLAlchemy refuses to define.
-            source_table = source_md.tables.get(key)
-            if source_table is None:
-                source_table = source_md.tables.get(table.name)
+            source_table = by_name.get(table.name)
             if source_table is None:
                 log("  %-28s absent in source, skipped" % table.name)
                 continue
+            # The source's own count, so the check below cannot be satisfied by a
+            # SELECT that silently returned nothing.
+            expected[table.name] = s_conn.execute(
+                select(func.count()).select_from(source_table)
+            ).scalar_one()
             shared = [c.name for c in table.columns if c.name in source_table.columns]
             rows = s_conn.execute(select(*[source_table.c[c] for c in shared])).fetchall()
             if rows:
@@ -92,19 +121,25 @@ def main() -> int:
             copied[table.name] = len(rows)
             log("  %-28s %d rows" % (table.name, len(rows)))
 
-    # Verify against the target, not against what we believe we sent.
+    if not copied:
+        log("FAILED: not one of the %d model tables was found in source schema %s" % (len(names), src_schema))
+        return 1
+
+    # Verify against the target and the source, not against what we believe we sent.
     ok = True
-    with dst.connect() as d_conn, src.connect() as s_conn:
+    with dst.connect() as d_conn:
         for table in target_md.sorted_tables:
             if table.name not in copied:
                 continue
             got = d_conn.execute(select(func.count()).select_from(table)).scalar_one()
-            if got != copied[table.name]:
-                log("  MISMATCH %s: source %d, target %d" % (table.name, copied[table.name], got))
+            if got != expected[table.name]:
+                log("  MISMATCH %s: source %d, target %d" % (table.name, expected[table.name], got))
                 ok = False
     if not ok:
         log("FAILED: row counts do not match; refusing to report success")
         return 1
+    if sum(expected.values()) == 0:
+        log("WARNING: the source is empty; the target is empty too, which matches")
     log("seed complete: %d rows across %d tables" % (sum(copied.values()), len(copied)))
     return 0
 
