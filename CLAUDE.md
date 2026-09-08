@@ -286,16 +286,32 @@ which is the only place that reaches both a project's Postgres and this disk.
    and note none of them is redundant: the standalone pair's rows were migrated into
    Gateway DB on 2026-09-07, and Gateway DB's and Heard DB's were converted to SQLite on
    2026-09-08. Take a dump first if any of it matters.
-7. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
+7. **Heard cannot send email: the SendGrid account is out of credits.** A verification
+   send fails with `HTTP 401`, which is misleading - the body says
+   `{"errors":[{"message":"Maximum credits exceeded"}]}`, and the same key answers
+   `/v3/scopes` 200 with `mail.send`, so the key is valid and the quota is not
+   (measured 2026-09-08). New accounts are created but can never verify, and Heard gates
+   several actions - including `DELETE /user/` - on being verified. This predates the
+   gateway move and is not caused by it; the fix is an owner call (upgrade the SendGrid
+   plan, or wait for the quota to reset). Worth doing alongside the signup spam: 192 of
+   198 accounts look automated, and they are what consumed the credits.
+8. **One throwaway account is stranded in Heard's database** -
+   `gateway-tz-check-20260908091256@erdemgunseli.com`, created to prove the timezone fix
+   through the real login path. It could not be removed afterwards: `DELETE /user/`
+   requires a verified account, verification needs an email SendGrid will not send, and
+   the disk is not reachable from a one-off job (§11). It is unverified, holds a random
+   password that was never stored, and is harmless - but it is residue. Remove it when
+   item 7 is fixed (verify, then delete through the API), or from inside the service.
+9. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
-8. ~~Point the service at `main`~~ **done 2026-09-08** - the branch merged (PR #1) and
+10. ~~Point the service at `main`~~ **done 2026-09-08** - the branch merged (PR #1) and
    the service now builds `main`; the first deploy from it was verified in production.
-9. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
+11. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
    instances without a bought domain; nothing points there yet (Heard is on
    `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
    Vercel per project when wanted.
-10. **Remove `SEED_FROM_DATABASE_URL` from the three secret files** once item 4 is done
+12. **Remove `SEED_FROM_DATABASE_URL` from the three secret files** once item 4 is done
     and the Postgres instances are deleted. It is inert today - the seeder only reads it
     when the target holds no rows - but a stale pointer to a deleted database is a trap
     for whoever next reads those files.
@@ -480,12 +496,19 @@ booting. Reverse the move with `db_pump.py`, which is bidirectional.
   left behind looked seeded forever. Heard booted on an empty database. Verify a copy
   against the **source's own** `count(*)`, make "nothing matched" a failure rather than a
   quiet zero, and key idempotence on data rather than on a file.
-- **Render does not surface every service's one-off job logs.** Jobs on this Docker
-  service run and report `succeeded` with no readable output - and the status does not
-  reflect the exit code either: a control job with a deliberately false assertion, which
-  exited 1, still reported `succeeded` (2026-09-08). Do not build a verification on a
-  job's status, and always run the negative control before trusting one that passes. Jobs
-  on a native-runtime service in the same account do stream their logs.
+- **One-off jobs on this service do not work at all - do not plan around them.** Three
+  separate jobs reported `succeeded` while doing nothing: an inventory that printed no
+  output, a control job asserting something deliberately false (so it should have exited
+  1), and a row deletion whose effect never appeared. The decisive test was a job whose
+  only action was an HTTP request to the gateway, chosen because the access log is
+  readable even though job logs are not - **the request never arrived**, so the supplied
+  command is not being executed, and the `succeeded` status reflects nothing (2026-09-08).
+  Consequences, both load-bearing: a job is not a verification channel, and **the
+  persistent disk is reachable only from the running service** - the boot-time seeder is
+  not merely the most convenient way in, it is the only one. Anything that must read or
+  edit `/data` has to run as part of the service's own startup. Jobs on a native-runtime
+  service in the same account do stream their logs and did work, which is what made this
+  easy to assume rather than check.
 - **Render certificate issuance can stall for one hostname.** Two of the three
   `api.<name>` domains got their certificates within ten minutes of verification;
   `api.heard` sat at "verified" with no certificate for 25 minutes (TLS handshake
