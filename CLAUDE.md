@@ -25,9 +25,9 @@ project processes. A declarative manifest (`gateway.toml`) drives everything.
 ```
             Render Web Service "Gateway Backend" (Starter, always-on, frankfurt)
    Internet ─► Caddy  (binds $PORT - the only public port; routes by Host, else by path)
-                 ├─► 127.0.0.1:8001  uvicorn  heard    api.heard.erdemgunseli.com    (own venv, own .env, Heard DB)
-                 ├─► 127.0.0.1:8002  uvicorn  insight  api.insight.erdemgunseli.com  (own venv, own .env, Gateway DB schema in_sight)
-                 └─► 127.0.0.1:8003  uvicorn  seorise  api.seorise.erdemgunseli.com  (own venv, own .env, Gateway DB schema seo_rise)
+                 ├─► 127.0.0.1:8001  uvicorn  heard    api.heard.erdemgunseli.com    (own venv, own .env, /data/heard.db)
+                 ├─► 127.0.0.1:8002  uvicorn  insight  api.insight.erdemgunseli.com  (own venv, own .env, /data/insight.db)
+                 └─► 127.0.0.1:8003  uvicorn  seorise  api.seorise.erdemgunseli.com  (own venv, own .env, /data/seorise.db)
               supervisord: supervises Caddy + one process per project
               secrets: /etc/secrets/<name>.env   (Render Secret Files, one per project)
               data:    the project's own Postgres (db = "external"), or /data/<name>.db (db = "sqlite")
@@ -138,14 +138,14 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
 | Reverse proxy | Caddy on `$PORT`, Host-routing, no TLS (Render terminates). |
 | Process mgr | supervisord; `autorestart` gives startup isolation. |
 | Secrets | Render Secret Files, one per project; injected into only that process by `launch.sh`. Logical isolation (not hardened vs same-UID). Service-level env vars are inherited by every process, so nothing project-specific ever goes there. |
-| Database | **SQLite is the default; Postgres is the exception** - see §10 for the conditions, the readiness gate and the conversion. A managed Postgres costs more per month than the whole instance it hangs off, so a project keeps one only by failing a stated condition. The three current projects still run `db = "external"` against Postgres (Heard against **Heard DB**; In-Sight and SEO Rise against **Gateway DB** schemas `in_sight` / `seo_rise`) - measured SQLite-ready on 2026-09-07 but not yet converted, because converting needs a disk, a backup mechanism and the owner's go-ahead. |
-| Hosting service | The pre-existing Render service **"Gateway Backend"** (`srv-d28cecuuk2gs73f5b5qg`, `egunseli4@gmail.com`, frankfurt, starter) was reused - same account and region as the projects' Postgres instances, which are reachable only by their internal hostnames. No persistent disk attached (no sqlite projects yet). |
+| Database | **SQLite is the default; Postgres is the exception** - see §10 for the conditions, the readiness gate and the conversion. A managed Postgres costs more per month than the whole instance it hangs off, so a project keeps one only by failing a stated condition. **All three projects were converted on 2026-09-08** and now run `db = "sqlite"` against `/data/<name>.db`; every managed Postgres behind them is suspended. |
+| Hosting service | The pre-existing Render service **"Gateway Backend"** (`srv-d28cecuuk2gs73f5b5qg`, `egunseli4@gmail.com`, frankfurt, starter) was reused - same account and region as the projects' Postgres instances, which are reachable only by their internal hostnames. A 1 GB disk (`dsk-dafqc31t0dsc73f9ehv0`) is mounted at `/data` since 2026-09-08; attaching it required disabling autoscaling, and it ends zero-downtime deploys. |
 | Env injection | Universal via supervisord + `launch.sh` (works for any app, not just `load_dotenv`). |
 | Entrypoint | **Factory layout NOT assumed** - `backend_dir`, `app`, `start_cmd` are per-project in the manifest. |
 | Resources | Soft only (worker count). No watchdog; container OOM restarts all (accepted). |
-| Health | Gateway health = Caddy up (`/__gateway/health`); never gated on individual projects. |
+| Health | Gateway health = Caddy up (`/__gateway/health`), answered in **every** Caddy site block so it never depends on which Host the checker sends; never gated on individual projects. |
 | Migrations on SQLite | New SQLite projects: `create_all` + `alembic stamp head` (skip PG-only history). Future migrations must be portable (Alembic ops + `sa.func.now()`) and use `op.batch_alter_table` for alters. |
-| Backups | Out of scope. |
+| Backups | Render's automatic daily disk snapshots (§10). No restore has been exercised yet. |
 | Name | `gateway`. |
 
 ---
@@ -170,6 +170,10 @@ scripts/
 tools/
   render_api.py           minimal Render REST client
   db_pump.py              model-driven cross-engine data pump (PG <-> SQLite)
+  pg_to_sqlite.py         the boot-time seeder launch.sh runs for a sqlite project whose
+                          secret file names a SEED_FROM_DATABASE_URL - idempotent by ROWS
+                          in the target, so it no-ops once converted and never contacts a
+                          suspended Postgres
   gateway_cli.py          add/remove, up, status, domains, secrets-push, env-unset,
                           provision-sqlite, suspend/resume, deploy, wait, migrate
 skill/SKILL.md            agent skill: swap-in / swap-out playbooks
@@ -193,33 +197,46 @@ types if it uses SQLite; a fast dependency-free health endpoint.
 
 ## 7. Status
 
-**Live (2026-09-06):** the process-per-project gateway runs on "Gateway Backend"
-from this repo, hosting all three projects, each against its real production
-database. Access paths today:
+**Live.** The process-per-project gateway runs on "Gateway Backend" from this repo,
+hosting all three projects. Since **2026-09-08** each runs on its own SQLite file on a
+1 GB persistent disk, and **every managed Postgres behind these products is suspended**.
 
-| Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Product's own API domain |
-|---|---|---|---|
-| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | **`api.heard.cc` - moved onto the gateway 2026-09-07**; heard.cc's frontend calls it |
-| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` registered here 2026-09-07, but no DNS record for it exists |
-| seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - |
+| Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Product's own API domain | Data |
+|---|---|---|---|---|
+| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | **`api.heard.cc`** (moved here 2026-09-07); heard.cc's frontend calls it | `/data/heard.db` — 663 rows, 9 tables |
+| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` registered here 2026-09-07, but no DNS record for it exists | `/data/insight.db` — 23 rows, 4 tables |
+| seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - | `/data/seorise.db` — 401 rows, 6 tables |
 
-**Every standalone service is suspended (2026-09-07)** - Heard Backend, In-Sight AI Backend
-and SEO Rise Backend - so the gateway is the only thing serving these products. Their two
-stale databases are suspended but kept as the rollback. Full evidence, including the
-account migration that turned out to be necessary, is in `verification/2026-09-07/`.
+**Everything else is suspended.** The three standalone services (Heard Backend, In-Sight
+AI Backend, SEO Rise Backend) since 2026-09-07; their two databases since then; and
+**Heard DB + Gateway DB since 2026-09-08**. Nothing has been deleted - all of it is the
+rollback. Evidence: `verification/2026-09-06/`, `verification/2026-09-07/`,
+`verification/2026-09-08/`.
 
-Host routing was verified live the same day: `/healthz` or `/`, `/docs` with its spec,
-and a DB-backed login lookup on each of the three hosts, from this environment and
-from an outside vantage point.
+**Verified after the SQLite conversion** (`verification/2026-09-08/`, all re-run with no
+Postgres running anywhere): 19 of 20 production probes (the twentieth is Vercel's apex
+redirect on `heard.cc`, not the gateway); a migrated account on each product answering
+401-wrong-password while an address that never existed answers 404, which is the app
+reading the row; the full **write** path on SEO Rise - register, duplicate rejected,
+login right and wrong, delete, gone - leaving no residue; a deliberate service restart
+after which the data survived and the seeder no-oped; and screenshots of every project's
+Swagger docs **on its own hostname** with the spec loaded, plus the path and legacy
+aliases.
 
-**Validated locally before deploy** (real Caddy 2.10 + supervisord 4.2.5 + the
-three venvs, throwaway SQLite secrets): Host routing for every host incl. extra
-hosts (200), path-prefix routing incl. legacy aliases (200), bare prefix → 308,
-`/docs` under a prefix with its spec routed by Referer (200), `/__gateway/health`
-(200), unknown host/path (404), X-Forwarded-Proto/For reaching the app as
-`scheme=https` + real client IP, graceful SIGTERM shutdown of all three. Memory
-idle: **~385 MB PSS total** (heard ~129, seorise ~110, insight ~90, caddy ~27) on
-a 512 MB instance - the headroom is thin; see §8.
+**The conversion cost 32 minutes of downtime** (06:19-06:51 UTC), against the hour the
+owner allowed, because two defects shipped together - a health route that only answered
+on unclaimed Hosts, and a seeder that reported success after copying nothing. Both are
+fixed and pinned by tests; the full account is in `verification/2026-09-08/README.md`
+and the lessons are in §11.
+
+**Validated locally before each deploy** (real Caddy 2.10 + supervisord 4.2.5 + the three
+venvs, throwaway SQLite secrets): Host routing for every host incl. extra hosts (200),
+`/__gateway/health` 200 on all six hostnames *and* the service host, path-prefix routing
+incl. legacy aliases (200), bare prefix -> 308, `/docs` under a prefix with its spec
+routed by Referer (200), unknown host/path (404), X-Forwarded-Proto/For reaching the app
+as `scheme=https` + real client IP, graceful SIGTERM shutdown of all three. Memory idle:
+**~385 MB PSS total** (heard ~129, seorise ~110, insight ~90, caddy ~27) on a 512 MB
+instance - the headroom is thin; see §8.
 
 **The database migration (2026-09-07).** The note that once stood here - that the
 standalone In-Sight / SEO Rise databases were stale copies of what Gateway DB already held
@@ -231,11 +248,11 @@ by email and remapping primary keys, and then proven through the public API. Nev
 sibling database is a copy - count the rows. Method, dry-run discipline, the two defects the
 dry runs caught, and rollback: `verification/2026-09-07/`.
 
-**Not exercised yet:** a real SQLite project on a persistent disk, a live
-`db_pump` swap, and `gateway migrate` (all need a case to arise). Note that
-`db_pump.py` was NOT the tool used above - it needs the project's own models and a
-reachable database, and this environment cannot open port 5432; the migration ran as a
-Render one-off job instead.
+**Not exercised yet:** a disk-snapshot **restore** (the one thing §10's backup position
+rests on), a live `db_pump` swap, and `gateway migrate`. Note that `db_pump.py` was not
+the tool used for either data move: the 2026-09-07 migration ran as a Render one-off job,
+and the 2026-09-08 conversion ran through `tools/pg_to_sqlite.py` at container boot,
+which is the only place that reaches both a project's Postgres and this disk.
 
 ---
 
@@ -249,33 +266,35 @@ Render one-off job instead.
    registrar lock and DNSSEC. The In-Sight extension points at
    `api.insight.erdemgunseli.com`, which now resolves; a store release is what
    ships it to users.
-2. ~~Move `api.heard.cc` onto the gateway~~ **done 2026-09-07** - moved with the owner's
-   go-ahead; the certificate issued in under a minute and heard.cc's frontend, which calls
-   that host, was verified afterwards.
-3. **Convert the three projects to SQLite and retire both Postgres instances** (§10).
-   All three were measured SQLite-ready on 2026-09-07 and their data is tiny (Heard
-   9.7 MB / 663 rows; In-Sight 4 users; SEO Rise 34 users), so the two managed Postgres
-   instances are now the bulk of the running cost for no capability the projects use.
-   Blocked on three owner decisions, not on code: attaching the disk (which ends
-   zero-downtime deploys), replacing the managed backups Postgres was providing, and a
-   window for the cutover. This is the single biggest remaining saving.
-4. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
+2. ~~Move `api.heard.cc` onto the gateway~~ **done 2026-09-07.**
+3. ~~Convert the three projects to SQLite and retire both Postgres instances~~
+   **done 2026-09-08** (§7, `verification/2026-09-08/`).
+4. **Restore one disk snapshot, once.** This is now the largest untested assumption in
+   the design: §10's whole backup position rests on Render snapshotting `/data` daily,
+   and that has never been exercised here. Until it has, keep every suspended Postgres
+   suspended rather than deleted - they are the only proven copy.
+5. **Memory headroom** - ~385 MB idle of 512 MB. If a project grows or a fourth
    joins, either trim its dependencies (the QUANTSOC lesson: the big SDKs - openai,
    anthropic, boto3 - are the cost) or upgrade the plan; both are owner calls.
-5. **Delete the three suspended standalone services and the two suspended databases**
-   once the owner is satisfied with the cutover. They are the rollback and cost nothing
-   suspended, so there is no hurry - but note their databases are NOT redundant copies:
-   their contents were migrated into Gateway DB on 2026-09-07, so deleting them discards
-   the only second copy of those rows. Take a dump first if that matters.
-6. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
+6. **Delete the suspended services and databases** once the owner is satisfied and item 4
+   has been done. Three standalone services, and four databases: Heard DB, Gateway DB,
+   and the two older standalone ones. They cost nothing suspended, so there is no hurry -
+   and note none of them is redundant: the standalone pair's rows were migrated into
+   Gateway DB on 2026-09-07, and Gateway DB's and Heard DB's were converted to SQLite on
+   2026-09-08. Take a dump first if any of it matters.
+7. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
-7. **Point the service at `main`** once this branch merges (`gateway up` reconciles
+8. **Point the service at `main`** once this branch merges (`gateway up` reconciles
    `branch`); it currently deploys `claude/gateway-setup-integration-q2gen4`.
-8. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
+9. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
    instances without a bought domain; nothing points there yet (Heard is on
    `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
    Vercel per project when wanted.
+10. **Remove `SEED_FROM_DATABASE_URL` from the three secret files** once item 4 is done
+    and the Postgres instances are deleted. It is inert today - the seeder only reads it
+    when the target holds no rows - but a stale pointer to a deleted database is a trap
+    for whoever next reads those files.
 
 ---
 
@@ -337,7 +356,9 @@ not be switched to `db = "sqlite"` until it passes.
 Measured on 2026-09-07, all three hosted projects pass (11 of 12 probes; the twelfth is
 Heard's registration returning 500 because the local SendGrid key is a dummy - the account
 is created and logs in, so the database layer is fine). Their data is small enough that the
-question is not close: Heard 9.7 MB / 663 rows, In-Sight 4 users, SEO Rise 34 users.
+question is not close: Heard 9.7 MB / 663 rows, In-Sight 4 users, SEO Rise 34 users. All
+three were converted on 2026-09-08, and the write path was then re-proven **in production**
+(`verification/2026-09-08/write_proof.sh`) rather than only on the local gate.
 
 ### The backup position, corrected
 
@@ -366,25 +387,43 @@ writer per project).
 
 ### The conversion
 
-One-time, per project, and never a silent side effect of a deploy:
+One-time, per project, and never a silent side effect of a deploy. This is the procedure
+as it was actually run on 2026-09-08, which differs from the one first written here:
+`db_pump.py` and `gateway provision-sqlite` were designed for an operator driving the move
+by hand, and the boot-time seeder replaced both because the container is the only thing
+that can reach a project's Postgres and this disk at the same time.
 
-1. Attach the disk (`gateway up` without `--no-disk`) and confirm `data_dir` is mounted.
-   Note the cost: a Render service with a disk cannot do zero-downtime deploys, so every
-   gateway deploy becomes a short hard restart rather than a swap.
-2. Provision the schema: `gateway provision-sqlite <name>` (`create_all` + `alembic stamp
-   head`, so a Postgres-authored migration history is not replayed).
-3. Copy the data with `tools/db_pump.py`, run **in the project's own venv** so its models
-   drive the conversion, from inside the gateway container - `entrypoint.sh` runs a command
-   passed to it instead of the gateway, so a Render one-off job can do this and is the only
-   place that reaches both the project's Postgres and this disk.
-4. Verify by row count per table, and by logging in as a real migrated account through the
-   public API - not by the pump's own report.
-5. Flip `db = "external"` to `db = "sqlite"`, remove `DATABASE_URL` from the project's
-   secret file (the launcher owns it for sqlite projects), deploy, re-verify.
-6. Only then suspend the Postgres - and keep it suspended, not deleted, until the first
-   backup has been restored successfully at least once.
+1. **Attach the disk** (`gateway up` without `--no-disk`) and confirm `data_dir` is
+   mounted. Two costs, both real: Render refuses a disk on a service with autoscaling
+   enabled (disable it first - `DELETE /services/{id}/autoscaling`), and a service with a
+   disk **cannot do zero-downtime deploys**, so every gateway deploy becomes a hard
+   restart. That is what turns a failed deploy into an outage rather than a no-op; do the
+   cutover in a window, not casually.
+2. **Point the project's secret file at its source**: add `SEED_FROM_DATABASE_URL` (and
+   `SEED_FROM_SCHEMA` when the data lives in a named schema), and **remove `DATABASE_URL`
+   and `SCHEMA`** - the launcher owns the URL for a sqlite project, and a leftover `SCHEMA`
+   would make the models build a schema-qualified table SQLite cannot address.
+3. **Flip `db = "external"` to `db = "sqlite"`** in the manifest and deploy. On first boot
+   `launch.sh` runs `tools/pg_to_sqlite.py` in the project's own venv: it creates the
+   schema from the project's models, copies every table in dependency order over the
+   columns the two sides share, and verifies each table against the **source's own**
+   `count(*)`. It refuses to report success if it matched no table, and the launcher
+   refuses to start the app on a database the seed could not prove - an app serving an
+   empty database looks exactly like every account having been deleted.
+4. **Verify from outside**, never from the seeder's own report: row counts in its log,
+   then a login through the public API as a real migrated account (a 401 for a wrong
+   password means the row was read; a 404 means it was not there), then a full
+   register/login/delete cycle to prove writes.
+5. **Restart the service on purpose** and confirm the data survives and the seeder logs
+   `target already holds N rows; nothing to seed`. This is the only check that separates
+   "written to the disk" from "written to the container's filesystem".
+6. **Only then suspend the Postgres** - and keep it suspended, not deleted, until a disk
+   snapshot has been restored successfully at least once.
 
-Reverse the same way: the pump is bidirectional.
+The seed is idempotent **by rows in the target, not by the database file existing**. That
+matters twice over: a redeploy never re-imports, and once a project is converted the seeder
+returns before opening the source at all, so suspending its Postgres cannot stop it
+booting. Reverse the move with `db_pump.py`, which is bidirectional.
 
 ## 11. Conventions for agents working here
 
@@ -404,6 +443,28 @@ Reverse the same way: the pump is bidirectional.
   every project process was already up (2026-09-06). The Dockerfile re-copies the
   binary with plain `cp` to drop the xattr. Apply the same to any other binary
   lifted from a vendor image.
+- **A health check does not choose the Host header you expect.** Caddy's
+  `/__gateway/health` matcher lived only in the catch-all site block, so when Render's
+  checker sent a request carrying one of the project hostnames it landed in that
+  project's block, reached the app, and got a 404 - twelve minutes of
+  `[heard] GET /__gateway/health 404` while every process was healthy, then a timed-out
+  deploy (2026-09-08). Anything the *gateway* must answer belongs in **every** site
+  block, not only the fallback. With a disk attached there is no zero-downtime swap, so
+  a health check that fails for a routing reason takes production down.
+- **A data copy that reports success must have counted something.** The first seeder
+  looked its source tables up by a key whose shape depends on the schema arguments
+  (`public.users` reflected, `users` searched), missed every table for a project on the
+  `public` schema, logged each one "absent in source, skipped", and exited 0 - and
+  because it treated the database file's existence as "already seeded", the empty file it
+  left behind looked seeded forever. Heard booted on an empty database. Verify a copy
+  against the **source's own** `count(*)`, make "nothing matched" a failure rather than a
+  quiet zero, and key idempotence on data rather than on a file.
+- **Render does not surface every service's one-off job logs.** Jobs on this Docker
+  service run and report `succeeded` with no readable output - and the status does not
+  reflect the exit code either: a control job with a deliberately false assertion, which
+  exited 1, still reported `succeeded` (2026-09-08). Do not build a verification on a
+  job's status, and always run the negative control before trusting one that passes. Jobs
+  on a native-runtime service in the same account do stream their logs.
 - **Render certificate issuance can stall for one hostname.** Two of the three
   `api.<name>` domains got their certificates within ten minutes of verification;
   `api.heard` sat at "verified" with no certificate for 25 minutes (TLS handshake
