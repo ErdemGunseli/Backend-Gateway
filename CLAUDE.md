@@ -339,15 +339,30 @@ Heard's registration returning 500 because the local SendGrid key is a dummy - t
 is created and logs in, so the database layer is fine). Their data is small enough that the
 question is not close: Heard 9.7 MB / 663 rows, In-Sight 4 users, SEO Rise 34 users.
 
-### The backup obligation
+### The backup position, corrected
 
-This is what Postgres was buying, and it is not optional. Render's managed Postgres does
-daily backups and point-in-time recovery; a SQLite file on a disk does not, and the disk is
-a single point of loss. **Before real user data moves to SQLite, a project must have a
-backup that leaves the instance** - the natural fit is a periodic
-`sqlite3 <db> "VACUUM INTO '<snapshot>'"` uploaded to the org's R2 bucket, since the
-factory already holds Cloudflare credentials. A project whose data cannot be protected
-that way keeps its Postgres under condition 3.
+An earlier draft of this section said a SQLite file on a disk has no backups. **That was
+wrong** - Render snapshots a persistent disk automatically every 24 hours and keeps
+snapshots at least seven days, restorable from the dashboard on any paid plan
+(https://render.com/docs/disks). So the real difference is *granularity*, not existence:
+
+| | Managed Postgres | SQLite on the disk |
+|---|---|---|
+| Backup | daily, automatic | daily, automatic |
+| Recovery point | any moment (point-in-time recovery) | the last daily snapshot |
+| Worst-case loss | seconds | up to 24 hours of writes |
+
+For the projects hosted here that gap is close to theoretical - SEO Rise wrote 214 messages
+in eighteen months - but it is the honest cost, and it is what condition 3 above is for. A
+project that genuinely cannot lose a day's writes keeps its Postgres.
+
+Where a tighter recovery point is wanted without one, add a periodic
+`sqlite3 <db> "VACUUM INTO '<snapshot>'"` uploaded to the org's R2 bucket (the factory
+already holds Cloudflare credentials); an hourly copy costs pennies and closes the gap.
+SQLite itself is not the risk: it is ACID, in WAL mode it survives process and power
+failure, and its classic corruption cases - a network filesystem, several concurrent
+writers - are both absent here (a Render disk is block storage, and the gateway runs one
+writer per project).
 
 ### The conversion
 
