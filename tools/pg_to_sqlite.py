@@ -78,7 +78,10 @@ def main() -> int:
     with src.connect() as s_conn, dst.begin() as d_conn:
         for table in target_md.sorted_tables:  # parents before children
             key = table.name if src_schema == "public" else "%s.%s" % (src_schema, table.name)
-            source_table = source_md.tables.get(key) or source_md.tables.get(table.name)
+            # `or` would truth-test a Table, which SQLAlchemy refuses to define.
+            source_table = source_md.tables.get(key)
+            if source_table is None:
+                source_table = source_md.tables.get(table.name)
             if source_table is None:
                 log("  %-28s absent in source, skipped" % table.name)
                 continue
