@@ -87,6 +87,32 @@ exits non-zero when the source holds none of the model tables.
   `api.seorise.erdemgunseli.com`) with the spec loaded, plus the path aliases and the
   legacy `/in-sight` and `/seo-rise` prefixes, gateway health, and the unknown-path 404.
 
+## What the timezone outage added, later the same day
+
+The conversion looked verified and was not. Hours after the cutover the owner reported
+Heard broken, and the cause was a second portability defect this folder's checks could
+not see: **SQLite ignores `DateTime(timezone=True)`** and returns naive datetimes, so
+every `stored < datetime.now(UTC)` comparison raised. It took session expiry, email
+verification, password reset, and the profile response the frontend fetches right after
+login. SEO Rise carried the identical defect, latent, on its verification path; In-Sight
+has no timezone-aware columns and was unaffected. Fixed as a column type in each product
+repo (`UtcDateTime`), deployed and proven through the real login path.
+
+The lesson is about the gate, not the bug: **`sqlite_readiness.sh` walks the write path
+and never the clock.** Register, reject a duplicate, log in - nothing there compares a
+stored timestamp with now, which is exactly why it certified all three projects while two
+of them were broken. `write_proof.sh` above has the same blind spot and passed for the
+same reason. A readiness run needs at least one flow that reads a timestamp back.
+
+Two further findings came out of the follow-up:
+
+- **One-off jobs on this Docker service do not execute at all.** A job whose only action
+  was an HTTP request to the gateway never made it - and the access log, unlike job logs,
+  is readable. So the `succeeded` status three earlier jobs returned meant nothing, and
+  **the persistent disk is reachable only from the running service**.
+- **Heard's SendGrid account is out of credits** (`Maximum credits exceeded`, returned as
+  a 401). New accounts cannot verify. This predates the gateway move.
+
 ## What was NOT checked
 
 - **No backup has been restored.** Render snapshots the disk daily, but that promise is
