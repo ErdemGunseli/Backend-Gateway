@@ -20,8 +20,10 @@
 #   app           ASGI target module:attr, imported from backend_dir
 #   requirements  relative to backend_dir;  workers  process worker count
 #   health_path   the project's fast dependency-free health route
-#   db            "sqlite" (gateway owns DATABASE_URL, file under data_dir) or
-#                 "external" (DATABASE_URL comes from the project's secret file)
+#   db            "sqlite" (the default: the gateway owns DATABASE_URL, a file under
+#                 data_dir) or "external" (DATABASE_URL comes from the secret file).
+#                 A sqlite project whose secret file sets SEED_FROM_DATABASE_URL is
+#                 seeded from that Postgres once, the first time its file is absent.
 #   start_cmd     optional explicit command (may use $PROJECT_PORT etc.);
 #                 default is gunicorn+UvicornWorker, or uvicorn if only that ships
 # ─────────────────────────────────────────────────────────────────────────────
@@ -52,9 +54,7 @@ secrets_dir = "/etc/secrets"
 
 # ─── Heard ───────────────────────────────────────────────────────────────────
 # Factory-style layout (backend under fastapi_backend/, absolute imports, its own
-# /healthz). Runs against its existing Postgres ("Heard DB") via the secret file,
-# so the standalone service and the gateway serve the same data until the
-# product's API domain is moved onto the gateway.
+# /healthz). SQLite on the persistent disk since 2026-09-08, seeded once from Heard DB.
 [[project]]
 name         = "heard"
 extra_hosts  = ["api.heard.cc"]     # -> api.heard.erdemgunseli.com, plus the product's own API domain once moved here
@@ -65,15 +65,14 @@ app          = "main:app"
 requirements = "requirements.txt"
 workers      = 1
 health_path  = "/healthz"
-db           = "external"
+db           = "sqlite"
 enabled      = true
 
 
 # ─── In-Sight ────────────────────────────────────────────────────────────────
 # Package layout with relative imports: imported as fastapi_backend.main from the
 # submodule root. Ships uvicorn only (no gunicorn), so the launcher runs uvicorn.
-# Data lives in the shared "Gateway DB" Postgres under schema `in_sight`
-# (DATABASE_URL + SCHEMA in its secret file), exactly as the previous gateway ran it.
+# SQLite since 2026-09-08, seeded once from Gateway DB's `in_sight` schema.
 [[project]]
 name         = "insight"
 extra_hosts  = ["api.in-sight.ai"]  # -> api.insight.erdemgunseli.com (the extension's BASE_URL)
@@ -84,12 +83,13 @@ app          = "fastapi_backend.main:app"
 requirements = "fastapi_backend/requirements.txt"
 workers      = 1
 health_path  = "/"
-db           = "external"
+db           = "sqlite"
 enabled      = true
 
 
 # ─── SEO Rise ────────────────────────────────────────────────────────────────
-# Same package layout as In-Sight; data in "Gateway DB" under schema `seo_rise`.
+# Same package layout as In-Sight. SQLite since 2026-09-08, seeded once from
+# Gateway DB's `seo_rise` schema.
 # -> api.seorise.erdemgunseli.com
 [[project]]
 name         = "seorise"
@@ -100,5 +100,5 @@ app          = "fastapi_backend.main:app"
 requirements = "fastapi_backend/requirements.txt"
 workers      = 1
 health_path  = "/"
-db           = "external"
+db           = "sqlite"
 enabled      = true

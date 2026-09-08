@@ -39,6 +39,20 @@ fi
 
 cd "$PROJECT_DIR"
 
+# 3b. One-time seed from the Postgres this project used to run on. Guarded by the
+#     database file's absence, so it happens once and a redeploy never re-imports.
+#     A failed seed must NOT start the app - serving an empty database would look
+#     like every account had been deleted - so the launcher exits and lets
+#     supervisord retry.
+if [[ "${PROJECT_DB:-}" == "sqlite" && -n "${SEED_FROM_DATABASE_URL:-}" && ! -s "$PROJECT_DB_PATH" ]]; then
+	echo "[$NAME] no database at $PROJECT_DB_PATH; seeding from the project's Postgres" >&2
+	if ! SEED_APP="$PROJECT_APP" "$PROJECT_VENV/bin/python" "$APP_ROOT/tools/pg_to_sqlite.py"; then
+		echo "[$NAME] ERROR: seed failed; refusing to start on an empty database" >&2
+		rm -f "$PROJECT_DB_PATH"
+		exit 1
+	fi
+fi
+
 # 4. Build the start command. A manifest `start_cmd` overrides everything (it is
 #    word-split by the shell, so it may reference $PROJECT_PORT, $PROJECT_VENV,
 #    $PROJECT_APP and $PROJECT_WORKERS). Otherwise:
