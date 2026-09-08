@@ -1,0 +1,72 @@
+[
+  {
+    "name": "gateway-health",
+    "path": "/__gateway/health",
+    "status": 200,
+    "title": "",
+    "spec_loaded": null
+  },
+  {
+    "name": "heard-root",
+    "path": "/heard/",
+    "status": 200,
+    "title": "",
+    "spec_loaded": null
+  },
+  {
+    "name": "heard-docs",
+    "path": "/heard/docs",
+    "status": 200,
+    "title": "FastAPI - Swagger UI",
+    "spec_loaded": true
+  },
+  {
+    "name": "insight-root",
+    "path": "/insight/",
+    "status": 200,
+    "title": "",
+    "spec_loaded": null
+  },
+  {
+    "name": "insight-docs",
+    "path": "/insight/docs",
+    "status": 200,
+    "title": "FastAPI - Swagger UI",
+    "spec_loaded": true
+  },
+  {
+    "name": "insight-legacy-docs",
+    "path": "/in-sight/docs",
+    "status": 200,
+    "title": "FastAPI - Swagger UI",
+    "spec_loaded": true
+  },
+  {
+    "name": "seorise-root",
+    "path": "/seorise/",
+    "status": 200,
+    "title": "",
+    "spec_loaded": null
+  },
+  {
+    "name": "seorise-docs",
+    "path": "/seorise/docs",
+    "status": 200,
+    "title": "FastAPI - Swagger UI",
+    "spec_loaded": true
+  },
+  {
+    "name": "seorise-legacy-docs",
+    "path": "/seo-rise/docs",
+    "status": 200,
+    "title": "FastAPI - Swagger UI",
+    "spec_loaded": true
+  },
+  {
+    "name": "unknown-404",
+    "path": "/nothing-here",
+    "status": 404,
+    "title": "",
+    "spec_loaded": null
+  }
+]

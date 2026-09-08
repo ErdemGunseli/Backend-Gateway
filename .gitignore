@@ -1,2 +1,9 @@
-.vscode
-__pycache__
+__pycache__/
+*.pyc
+.venv/
+generated/
+
+# Real secrets — never commit (secrets.example/ is the tracked template)
+secrets/
+render.env
+*.local.env

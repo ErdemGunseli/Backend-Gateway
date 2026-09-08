@@ -1,0 +1,21 @@
+# Render blueprint for the gateway service.
+# One always-on Starter web service running the Docker image; Caddy binds the
+# injected $PORT. A persistent disk holds the per-project SQLite databases.
+# Per-project secret files are added out-of-band (dashboard or `gateway secrets-push`).
+services:
+  - type: web
+    name: gateway
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Health passes whenever Caddy is up, independent of individual projects (#8):
+    healthCheckPath: /__gateway/health
+    # Gateway deploys are coordinated via per-project deploy hooks, not push:
+    autoDeploy: false
+    # Only needed for db = "sqlite" projects; the live service runs external Postgres
+    # projects only and has no disk attached (see CLAUDE.md §5).
+    disk:
+      name: gateway-data
+      mountPath: /data
+      sizeGB: 1

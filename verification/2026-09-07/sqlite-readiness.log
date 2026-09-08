@@ -1,0 +1,246 @@
+2026-09-07 20:32:35,159 INFO Set uid to user 0 succeeded
+2026-09-07 20:32:35,161 INFO supervisord started with pid 1955
+2026-09-07 20:32:36,164 INFO spawned: 'caddy' with pid 1957
+2026-09-07 20:32:36,166 INFO spawned: 'heard' with pid 1958
+2026-09-07 20:32:36,168 INFO spawned: 'insight' with pid 1959
+2026-09-07 20:32:36,170 INFO spawned: 'seorise' with pid 1963
+2026-09-07 20:32:37,254 INFO success: caddy entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-09-07 20:32:37,254 INFO success: heard entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-09-07 20:32:37,254 INFO success: insight entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-09-07 20:32:37,254 INFO success: seorise entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+2026-09-07 20:33:05,460 WARN received SIGTERM indicating exit request
+2026-09-07 20:33:05,460 INFO waiting for caddy, heard, insight, seorise to die
+2026-09-07 20:33:05,560 WARN stopped: seorise (exit status 143)
+2026-09-07 20:33:05,651 WARN stopped: insight (exit status 143)
+2026-09-07 20:33:05,719 WARN stopped: heard (exit status 143)
+2026-09-07 20:33:05,722 INFO stopped: caddy (exit status 0)
+round certificate maintenance","cache":"0xc00063f780"}
+{"level":"warn","ts":1788813156.248504,"logger":"http","msg":"HTTP/2 skipped because it requires TLS","network":"tcp","addr":":18080"}
+{"level":"warn","ts":1788813156.2487457,"logger":"http","msg":"HTTP/3 skipped because it requires TLS","network":"tcp","addr":":18080"}
+{"level":"info","ts":1788813156.2487936,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
+{"level":"info","ts":1788813156.2494743,"msg":"autosaved config (load with --resume flag)","file":"/root/.config/caddy/autosave.json"}
+{"level":"info","ts":1788813156.2496016,"msg":"serving initial configuration"}
+{"level":"info","ts":1788813156.2532718,"logger":"tls","msg":"storage cleaning happened too recently; skipping for now","storage":"FileStorage:/root/.local/share/caddy","instance":"d9e1f872-acee-4307-8511-41a169df0bbd","try_again":1788899556.2532687,"try_again_in":86399.999999544}
+{"level":"info","ts":1788813156.2535553,"logger":"tls","msg":"finished cleaning storage units"}
+[insight] INFO:     Started server process [1967]
+[insight] INFO:     Waiting for application startup.
+[insight] [1;32mApplication startup successful.[0m
+[insight] [1;34mScheduler started and model training job scheduled.[0m
+[insight] INFO:     Application startup complete.
+[insight] INFO:     Uvicorn running on http://127.0.0.1:8002 (Press CTRL+C to quit)
+[seorise] INFO:     Started server process [1969]
+[seorise] INFO:     Waiting for application startup.
+[seorise] INFO:     Application startup complete.
+[seorise] INFO:     Uvicorn running on http://127.0.0.1:8003 (Press CTRL+C to quit)
+[heard] 2026-09-07 20:32:38,109 | INFO  | database | Non-PostgreSQL backend (sqlite); running migrations without advisory lock.
+[heard] 2026-09-07 20:32:38,109 | INFO  | database | Creating database tables if they don't exist...
+[heard] 2026-09-07 20:32:38,325 | INFO  | database | Running database migrations...
+[heard] 2026-09-07 20:32:38,326 | INFO  | alembic.runtime.migration | Context impl SQLiteImpl.
+[heard] 2026-09-07 20:32:38,327 | INFO  | alembic.runtime.migration | Will assume non-transactional DDL.
+[heard] 2026-09-07 20:32:38,331 | INFO  | database | Migrations complete.
+[heard] INFO:     Started server process [1965]
+[heard] INFO:     Waiting for application startup.
+[heard] INFO:     Application startup complete.
+[heard] INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+[heard] 2026-09-07 20:33:00,077 | WARNING | passlib.handlers.bcrypt | (trapped) error reading bcrypt version
+[heard] Traceback (most recent call last):
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+[heard]     version = _bcrypt.__about__.__version__
+[heard]               ^^^^^^^^^^^^^^^^^
+[heard] AttributeError: module 'bcrypt' has no attribute '__about__'
+[heard] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 500 Internal Server Error
+[heard] ERROR:    Exception in ASGI application
+[heard]   + Exception Group Traceback (most recent call last):
+[heard]   |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 76, in collapse_excgroups
+[heard]   |     yield
+[heard]   |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 178, in __call__
+[heard]   |     async with anyio.create_task_group() as task_group:
+[heard]   |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 767, in __aexit__
+[heard]   |     raise BaseExceptionGroup(
+[heard]   | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+[heard]   +-+---------------- 1 ----------------
+[heard]     | Traceback (most recent call last):
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 409, in run_asgi
+[heard]     |     result = await app(  # type: ignore[func-returns-value]
+[heard]     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+[heard]     |     return await self.app(scope, receive, send)
+[heard]     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+[heard]     |     await super().__call__(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+[heard]     |     await self.middleware_stack(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+[heard]     |     raise exc
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+[heard]     |     await self.app(scope, receive, _send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 177, in __call__
+[heard]     |     with recv_stream, send_stream, collapse_excgroups():
+[heard]     |   File "/usr/lib/python3.11/contextlib.py", line 158, in __exit__
+[heard]     |     self.gen.throw(typ, value, traceback)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 82, in collapse_excgroups
+[heard]     |     raise exc
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 179, in __call__
+[heard]     |     response = await self.dispatch_func(request, call_next)
+[heard]     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/slowapi/middleware.py", line 128, in dispatch
+[heard]     |     return await call_next(request)
+[heard]     |            ^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 154, in call_next
+[heard]     |     raise app_exc
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 141, in coro
+[heard]     |     await self.app(scope, receive_or_disconnect, send_no_error)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/sessions.py", line 85, in __call__
+[heard]     |     await self.app(scope, receive, send_wrapper)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+[heard]     |     await self.app(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+[heard]     |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+[heard]     |     raise exc
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+[heard]     |     await app(scope, receive, sender)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 715, in __call__
+[heard]     |     await self.middleware_stack(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 735, in app
+[heard]     |     await route.handle(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+[heard]     |     await self.app(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+[heard]     |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+[heard]     |     raise exc
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+[heard]     |     await app(scope, receive, sender)
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+[heard]     |     response = await f(request)
+[heard]     |                ^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 327, in app
+[heard]     |     content = await serialize_response(
+[heard]     |               ^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 166, in serialize_response
+[heard]     |     value, errors_ = field.validate(response_content, {}, loc=("response",))
+[heard]     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/_compat.py", line 129, in validate
+[heard]     |     self._type_adapter.validate_python(value, from_attributes=True),
+[heard]     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/pydantic/type_adapter.py", line 441, in validate_python
+[heard]     |     return self.validator.validate_python(
+[heard]     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/fastapi_backend/schemas.py", line 61, in inject_computed_fields
+[heard]     |     return {**data.__dict__, 'verification_cooldown_seconds': data.get_verification_cooldown_seconds()}
+[heard]     |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     |   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/fastapi_backend/models.py", line 73, in get_verification_cooldown_seconds
+[heard]     |     if now_utc < cooldown_expires:
+[heard]     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]     | TypeError: can't compare offset-naive and offset-aware datetimes
+[heard]     +------------------------------------
+[heard] 
+[heard] During handling of the above exception, another exception occurred:
+[heard] 
+[heard] Traceback (most recent call last):
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 409, in run_asgi
+[heard]     result = await app(  # type: ignore[func-returns-value]
+[heard]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+[heard]     return await self.app(scope, receive, send)
+[heard]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+[heard]     await super().__call__(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+[heard]     await self.middleware_stack(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+[heard]     raise exc
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+[heard]     await self.app(scope, receive, _send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 177, in __call__
+[heard]     with recv_stream, send_stream, collapse_excgroups():
+[heard]   File "/usr/lib/python3.11/contextlib.py", line 158, in __exit__
+[heard]     self.gen.throw(typ, value, traceback)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 82, in collapse_excgroups
+[heard]     raise exc
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 179, in __call__
+[heard]     response = await self.dispatch_func(request, call_next)
+[heard]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/slowapi/middleware.py", line 128, in dispatch
+[heard]     return await call_next(request)
+[heard]            ^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 154, in call_next
+[heard]     raise app_exc
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 141, in coro
+[heard]     await self.app(scope, receive_or_disconnect, send_no_error)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/sessions.py", line 85, in __call__
+[heard]     await self.app(scope, receive, send_wrapper)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+[heard]     await self.app(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+[heard]     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+[heard]     raise exc
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+[heard]     await app(scope, receive, sender)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 715, in __call__
+[heard]     await self.middleware_stack(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 735, in app
+[heard]     await route.handle(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+[heard]     await self.app(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+[heard]     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+[heard]     raise exc
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+[heard]     await app(scope, receive, sender)
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+[heard]     response = await f(request)
+[heard]                ^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 327, in app
+[heard]     content = await serialize_response(
+[heard]               ^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 166, in serialize_response
+[heard]     value, errors_ = field.validate(response_content, {}, loc=("response",))
+[heard]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/fastapi/_compat.py", line 129, in validate
+[heard]     self._type_adapter.validate_python(value, from_attributes=True),
+[heard]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/.venv/lib/python3.11/site-packages/pydantic/type_adapter.py", line 441, in validate_python
+[heard]     return self.validator.validate_python(
+[heard]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/fastapi_backend/schemas.py", line 61, in inject_computed_fields
+[heard]     return {**data.__dict__, 'verification_cooldown_seconds': data.get_verification_cooldown_seconds()}
+[heard]                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/heard/fastapi_backend/models.py", line 73, in get_verification_cooldown_seconds
+[heard]     if now_utc < cooldown_expires:
+[heard]        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[heard] TypeError: can't compare offset-naive and offset-aware datetimes
+[heard] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 409 Conflict
+[heard] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 200 OK
+[heard] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 401 Unauthorized
+[insight] (trapped) error reading bcrypt version
+[insight] Traceback (most recent call last):
+[insight]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/insight/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+[insight]     version = _bcrypt.__about__.__version__
+[insight]               ^^^^^^^^^^^^^^^^^
+[insight] AttributeError: module 'bcrypt' has no attribute '__about__'
+[insight] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 201 Created
+[insight] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 409 Conflict
+[insight] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 200 OK
+[insight] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 401 Unauthorized
+[seorise] (trapped) error reading bcrypt version
+[seorise] Traceback (most recent call last):
+[seorise]   File "/tmp/claude-0/-home-user/bcc90d1b-32be-5867-9c98-6a6f49d12757/scratchpad/gwlocal/projects/seorise/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+[seorise]     version = _bcrypt.__about__.__version__
+[seorise]               ^^^^^^^^^^^^^^^^^
+[seorise] AttributeError: module 'bcrypt' has no attribute '__about__'
+[seorise] [1;34mCode (plaintext): 033691[0m
+[seorise] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 201 Created
+[seorise] INFO:     127.0.0.1:0 - "POST /user/ HTTP/1.1" 409 Conflict
+[seorise] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 200 OK
+[seorise] INFO:     127.0.0.1:0 - "POST /auth/token HTTP/1.1" 401 Unauthorized
+[seorise] INFO:     Shutting down
+[insight] INFO:     Shutting down
+[heard] INFO:     Shutting down
+{"level":"info","ts":1788813185.7194102,"msg":"shutting down apps, then terminating","signal":"SIGTERM"}
+{"level":"warn","ts":1788813185.7194633,"msg":"exiting; byeee!! 👋","signal":"SIGTERM"}
+{"level":"info","ts":1788813185.7195246,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1788813185.719958,"msg":"shutdown complete","signal":"SIGTERM","exit_code":0}

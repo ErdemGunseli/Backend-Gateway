@@ -1,22 +1,22 @@
-# ───── FRONTEND FOLDERS ─────
-seo_rise/next-pwa/
-in_sight/react-extension/
-heard/frontend/
+# Only the gateway orchestrator and each project's backend reach the image.
+.git
+**/.git
+generated/
+secrets/
+**/.venv/
 
-# ───── BUILD OUTPUTS ─────
-**/build/
-**/*.zip
-
-# ───── NODE + STATIC JUNK ─────
+# Frontends and their build output never run in the gateway.
+projects/*/next-pwa/
+projects/*/react-extension/
+projects/*/frontend/
 **/node_modules/
-**/dist/
-**/public/
 **/.next/
+**/dist/
+**/build/
 
-# ───── OS/IDE FILES ─────
-**/.DS_Store
-**/*.log
-**/.vscode/
+# Local cruft.
 **/__pycache__/
 **/*.pyc
-
+**/.DS_Store
+**/.vscode/
+**/*.log
