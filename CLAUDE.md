@@ -455,6 +455,23 @@ booting. Reverse the move with `db_pump.py`, which is bidirectional.
   deploy (2026-09-08). Anything the *gateway* must answer belongs in **every** site
   block, not only the fallback. With a disk attached there is no zero-downtime swap, so
   a health check that fails for a routing reason takes production down.
+- **SQLite returns NAIVE datetimes, whatever the column says.** `DateTime(timezone=True)`
+  is honoured by PostgreSQL's `timestamptz` and silently ignored by SQLite, which has no
+  timestamp type at all: SQLAlchemy writes a formatted string and drops the tzinfo. Every
+  `stored < datetime.now(UTC)` comparison then raises `TypeError: can't compare
+  offset-naive and offset-aware datetimes`. Heard hit this within hours of its conversion
+  - session expiry, verification, password reset, and the profile response the frontend
+  fetches right after login, so the app looked broken from the first authenticated
+  request (2026-09-08); SEO Rise had the same defect sitting latent on its verification
+  path. The fix is a **column type** (`UtcDateTime` in each project's `db_types.py`),
+  never a patch per call site, and it belongs in the portability work alongside
+  `JSONColumn`. **Add it before converting a project, not after.**
+- **The readiness gate walks the write path; it does not walk the clock.**
+  `sqlite_readiness.sh` registers, rejects a duplicate and logs in - which is why it
+  passed all three projects while this defect was present in two of them. Nothing on that
+  path compares a stored timestamp with now. A project's gate run should also exercise
+  one flow that reads a timestamp back and compares it (a verification code, a session
+  refresh), or the gate will keep certifying this class of bug as ready.
 - **A data copy that reports success must have counted something.** The first seeder
   looked its source tables up by a key whose shape depends on the schema arguments
   (`public.users` reflected, `users` searched), missed every table for a project on the
