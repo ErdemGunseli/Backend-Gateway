@@ -289,8 +289,8 @@ which is the only place that reaches both a project's Postgres and this disk.
 7. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
-8. **Point the service at `main`** once this branch merges (`gateway up` reconciles
-   `branch`); it currently deploys `claude/gateway-setup-integration-q2gen4`.
+8. ~~Point the service at `main`~~ **done 2026-09-08** - the branch merged (PR #1) and
+   the service now builds `main`; the first deploy from it was verified in production.
 9. **Frontends at `<project>.erdemgunseli.com`** - the factory default for new
    instances without a bought domain; nothing points there yet (Heard is on
    `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
