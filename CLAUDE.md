@@ -286,22 +286,33 @@ which is the only place that reaches both a project's Postgres and this disk.
    and note none of them is redundant: the standalone pair's rows were migrated into
    Gateway DB on 2026-09-07, and Gateway DB's and Heard DB's were converted to SQLite on
    2026-09-08. Take a dump first if any of it matters.
-7. **Heard cannot send email: the SendGrid account is out of credits.** A verification
-   send fails with `HTTP 401`, which is misleading - the body says
-   `{"errors":[{"message":"Maximum credits exceeded"}]}`, and the same key answers
-   `/v3/scopes` 200 with `mail.send`, so the key is valid and the quota is not
-   (measured 2026-09-08). New accounts are created but can never verify, and Heard gates
-   several actions - including `DELETE /user/` - on being verified. This predates the
-   gateway move and is not caused by it; the fix is an owner call (upgrade the SendGrid
-   plan, or wait for the quota to reset). Worth doing alongside the signup spam: 192 of
-   198 accounts look automated, and they are what consumed the credits.
+7. **Heard now sends through Brevo; one owner step remains.** SendGrid was out of
+   credits - a verification send failed `HTTP 401` with
+   `{"errors":[{"message":"Maximum credits exceeded"}]}` while the same key answered
+   `/v3/scopes` 200 with `mail.send`, so the key was valid and the quota was not
+   (measured 2026-09-08). Heard's backend now picks its provider from whichever
+   credential is present, and `heard.env` carries the org's `BREVO_API_KEY` plus an
+   explicit `EMAIL_PROVIDER='BREVO'` (2026-09-14). `SENDGRID_API_KEY` stays in the file
+   as the rollback - flipping `EMAIL_PROVIDER` back is the whole revert.
+   **The remaining step is Brevo's, not the gateway's:** `hello@heard.cc` was registered
+   as a sender (id 2) and is `active: false` until the validation code Brevo mailed to
+   that address is entered at https://app.brevo.com/senders/list. Brevo refuses a send
+   from an unvalidated sender, so until then Heard reports "we couldn't send your code"
+   on the verify screen rather than failing silently. `heard.cc` is not an authenticated
+   Brevo domain either (`spfError: true` on registration; its SPF is
+   `v=spf1 include:spf.privateemail.com ~all` and its DNS is at Namecheap, not
+   Cloudflare) - single-sender validation is enough to send, domain authentication at
+   https://app.brevo.com/senders/domain/list is what fixes deliverability.
+   The account is the org's QuantSoc Brevo workspace, free plan, 299 credits - which is
+   also why the signup spam matters: 192 of 198 accounts look automated, and on a
+   299-credit plan they would exhaust it again.
 8. **One throwaway account is stranded in Heard's database** -
    `gateway-tz-check-20260908091256@erdemgunseli.com`, created to prove the timezone fix
    through the real login path. It could not be removed afterwards: `DELETE /user/`
-   requires a verified account, verification needs an email SendGrid will not send, and
+   requires a verified account, verification needed an email that could not be sent, and
    the disk is not reachable from a one-off job (§11). It is unverified, holds a random
-   password that was never stored, and is harmless - but it is residue. Remove it when
-   item 7 is fixed (verify, then delete through the API), or from inside the service.
+   password that was never stored, and is harmless - but it is residue. Remove it once item 7's
+   sender validation lands (verify, then delete through the API), or from inside the service.
 9. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
