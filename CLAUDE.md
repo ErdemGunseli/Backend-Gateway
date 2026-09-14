@@ -286,7 +286,8 @@ which is the only place that reaches both a project's Postgres and this disk.
    and note none of them is redundant: the standalone pair's rows were migrated into
    Gateway DB on 2026-09-07, and Gateway DB's and Heard DB's were converted to SQLite on
    2026-09-08. Take a dump first if any of it matters.
-7. **Heard now sends through Brevo; one owner step remains.** SendGrid was out of
+7. **Heard sends through Brevo and is DELIVERING; only DMARC is outstanding.**
+   SendGrid was out of
    credits - a verification send failed `HTTP 401` with
    `{"errors":[{"message":"Maximum credits exceeded"}]}` while the same key answered
    `/v3/scopes` 200 with `mail.send`, so the key was valid and the quota was not
@@ -294,13 +295,25 @@ which is the only place that reaches both a project's Postgres and this disk.
    credential is present, and `heard.env` carries the org's `BREVO_API_KEY` plus an
    explicit `EMAIL_PROVIDER='BREVO'` (2026-09-14). `SENDGRID_API_KEY` stays in the file
    as the rollback - flipping `EMAIL_PROVIDER` back is the whole revert.
-   **The remaining step is Brevo's, not the gateway's:** `hello@heard.cc` was registered
-   as a sender (id 2) and is `active: false` until it is validated at
-   https://app.brevo.com/senders/list. `heard.cc` is not an authenticated Brevo domain
-   either (`spfError: true` on registration; its SPF is
-   `v=spf1 include:spf.privateemail.com ~all` and its DNS is at Namecheap, not
-   Cloudflare) - single-sender validation is enough to send, domain authentication at
-   https://app.brevo.com/senders/domain/list is what fixes deliverability.
+   **`hello@heard.cc` was registered as a sender (id 2) and the owner validated it on
+   2026-09-14 - mail now works.** Proof is a real user, not a probe: a genuine signup at
+   10:22 UTC+1 was sent `Verification Code: 729595` and Brevo logged it **delivered**, the
+   first code Heard has actually put in a user's hands since SendGrid ran dry. (A probe
+   reset to the §8 test account soft-bounced the same minute for an unrelated reason -
+   `Unable to find MX of domain erdemgunseli.com` - which is a genuine SMTP answer, not a
+   sender rejection.) **Domain authentication is started but BLOCKED ON ONE DUPLICATE RECORD.**
+   `heard.cc` was registered for authentication (`6aa7bbe37364b04ab000382f`) and the owner
+   added all four records at Namecheap on 2026-09-14. Three verify green - `brevo1._domainkey`
+   and `brevo2._domainkey` CNAMEs and the `brevo-code:` TXT. The fourth fails because
+   `_dmarc.heard.cc` now carries **two** TXT records: a pre-existing `v=DMARC1; p=none;` and
+   Brevo's `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com`. Per RFC 7489 a domain with two
+   `v=DMARC1` records has NO valid DMARC at all, so `PUT /v3/senders/domains/heard.cc/authenticate`
+   returns 400. **Fix: delete the old bare record at Namecheap, keep Brevo's, then re-run that
+   PUT.** Until then sends go out on Brevo's shared IP with default DKIM - working, but weaker
+   inbox placement. SPF was deliberately left alone (`v=spf1 include:spf.privateemail.com ~all`);
+   Brevo does not ask for an SPF change and editing it would break Private Email. DNS is at
+   Namecheap, not Cloudflare, so no factory credential in this repo can make these changes -
+   they are hand-edits in the Namecheap panel.
    **Brevo rejects an unvalidated sender ASYNCHRONOUSLY, which defeats the
    caller-side failure reporting** - measured 2026-09-14: `POST /v3/smtp/email` from
    `hello@heard.cc` returned **201** with a `messageId`, and the event log then carried
@@ -312,16 +325,19 @@ which is the only place that reaches both a project's Postgres and this disk.
    missing-credential error. Worth adding, but it is moot the moment the sender is
    validated, and landing it costs a restart of all three projects - so it is a
    recommendation, not a pending defect.
-   The account is the org's QuantSoc Brevo workspace, free plan, 299 credits - which is
-   also why the signup spam matters: 192 of 198 accounts look automated, and on a
-   299-credit plan they would exhaust it again.
+   The account is the org's QuantSoc Brevo workspace, **free plan, 297 of 299 credits left
+   as of 2026-09-14** - see item 13, which is now the live risk rather than a footnote.
 8. **One throwaway account is stranded in Heard's database** -
    `gateway-tz-check-20260908091256@erdemgunseli.com`, created to prove the timezone fix
    through the real login path. It could not be removed afterwards: `DELETE /user/`
    requires a verified account, verification needed an email that could not be sent, and
    the disk is not reachable from a one-off job (§11). It is unverified, holds a random
-   password that was never stored, and is harmless - but it is residue. Remove it once item 7's
-   sender validation lands (verify, then delete through the API), or from inside the service.
+   password that was never stored, and is harmless - but it is residue. **The remedy first
+   written here does not work:** `erdemgunseli.com` has no MX record (measured 2026-09-14, a
+   Brevo soft bounce: `Unable to find MX of domain erdemgunseli.com`), so that address can
+   never receive a verification code, so the account can never verify and can never call
+   `DELETE /user/`. Working Brevo mail does not unblock it. The only route left is from inside
+   the running service, which per §11 is also the only thing that can reach `/data`.
 9. **Wire deploy** - per-project CI bumps the submodule pointer + calls `gateway
    deploy`; today it's manual (`git submodule update --remote projects/<name>`,
    commit, `gateway deploy --wait`).
@@ -331,7 +347,16 @@ which is the only place that reaches both a project's Postgres and this disk.
    instances without a bought domain; nothing points there yet (Heard is on
    `heard.cc`, SEO Rise's Vercel project has no custom domain). Add the CNAME to
    Vercel per project when wanted.
-12. **Remove `SEED_FROM_DATABASE_URL` from the three secret files** once item 4 is done
+13. **Heard's signup spam will exhaust the Brevo quota, exactly as it exhausted SendGrid's.**
+    192 of Heard's 198 accounts look automated (§7 history), and every one of them now costs a
+    Brevo credit at signup. The free plan holds 299/month and stood at 297 hours after the
+    cutover. Nothing in Heard rate-limits or filters registration today, so the provider switch
+    bought time rather than fixing the cause - the same wall arrives again, just on a new
+    account. The work is product-side in Heard, not gateway-side: per-IP rate limiting on
+    registration, disposable/throwaway-domain rejection, and a challenge on the signup form.
+    Do this before topping up or upgrading a plan; paying for a bigger quota to absorb bot
+    signups is buying the symptom.
+14. **Remove `SEED_FROM_DATABASE_URL` from the three secret files** once item 4 is done
     and the Postgres instances are deleted. It is inert today - the seeder only reads it
     when the target holds no rows - but a stale pointer to a deleted database is a trap
     for whoever next reads those files.
