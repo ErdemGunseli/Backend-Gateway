@@ -295,14 +295,23 @@ which is the only place that reaches both a project's Postgres and this disk.
    explicit `EMAIL_PROVIDER='BREVO'` (2026-09-14). `SENDGRID_API_KEY` stays in the file
    as the rollback - flipping `EMAIL_PROVIDER` back is the whole revert.
    **The remaining step is Brevo's, not the gateway's:** `hello@heard.cc` was registered
-   as a sender (id 2) and is `active: false` until the validation code Brevo mailed to
-   that address is entered at https://app.brevo.com/senders/list. Brevo refuses a send
-   from an unvalidated sender, so until then Heard reports "we couldn't send your code"
-   on the verify screen rather than failing silently. `heard.cc` is not an authenticated
-   Brevo domain either (`spfError: true` on registration; its SPF is
+   as a sender (id 2) and is `active: false` until it is validated at
+   https://app.brevo.com/senders/list. `heard.cc` is not an authenticated Brevo domain
+   either (`spfError: true` on registration; its SPF is
    `v=spf1 include:spf.privateemail.com ~all` and its DNS is at Namecheap, not
    Cloudflare) - single-sender validation is enough to send, domain authentication at
    https://app.brevo.com/senders/domain/list is what fixes deliverability.
+   **Brevo rejects an unvalidated sender ASYNCHRONOUSLY, which defeats the
+   caller-side failure reporting** - measured 2026-09-14: `POST /v3/smtp/email` from
+   `hello@heard.cc` returned **201** with a `messageId`, and the event log then carried
+   `error / "Sending has been rejected because the sender you used hello@heard.cc is not
+   valid"`. So Heard reports the code as sent and the user never receives one. Heard's
+   honest-failure work only covers what a provider refuses at request time; the guard
+   that would cover this is a boot-time check that `CONTACT_EMAIL` is an active sender
+   (`GET /v3/senders`) or sits on an authenticated domain, logged as loudly as the
+   missing-credential error. Worth adding, but it is moot the moment the sender is
+   validated, and landing it costs a restart of all three projects - so it is a
+   recommendation, not a pending defect.
    The account is the org's QuantSoc Brevo workspace, free plan, 299 credits - which is
    also why the signup spam matters: 192 of 198 accounts look automated, and on a
    299-credit plan they would exhaust it again.
