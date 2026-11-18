@@ -105,9 +105,11 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
      `extra_hosts` (a product's own API domain, e.g. `api.heard.cc`).
   2. **Path-prefix routing** on any other Host: `/<name>/…` (plus legacy aliases
      such as `/in-sight`, `/seo-rise`) is stripped and proxied to the project. This
-     is how the service's own `backend-gateway-zyu0.onrender.com` address reaches
-     every project before the custom domains resolve, and how clients built
-     against the previous gateway's URLs keep working. FastAPI's `/docs` fetches
+     is how the service's own `gateway-backend-ohjf.onrender.com` address reaches
+     every project before the custom domains resolve. The legacy path aliases
+     remain on this new service base; they do not keep the old Render hostname
+     alive. Clients configured with an old gateway base URL must be repointed to
+     the new base or the appropriate public project API domain. FastAPI's `/docs` fetches
      `/openapi.json` from the host root, so under a prefix that one request is
      routed by its `Referer` - a browser-only convenience for the interactive
      docs; API clients never depend on it.
@@ -122,9 +124,10 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
   → project app. Projects are mutually invisible.
 - **Onboard:** add submodule + create Secret File + add a `[[project]]` block →
   deploy. Config regenerates; the new process joins.
-- **Deploy:** `gateway deploy --wait` (autoDeploy is off). Every deploy rebuilds
-  the image and **restarts all projects** (a few seconds - the accepted cost of
-  consolidation; a project that deploys often should graduate out).
+- **Deploy:** `gateway deploy --wait` (autoDeploy is off) intentionally rebuilds
+  the selected branch's latest commit and **restarts all projects**. An env/secret-only
+  restart instead needs the guarded `deploy_only` image-identity procedure in
+  `skill/deploy.md`; it must not accidentally rebuild a newer branch head.
 - **Swap in/out:** see `skill/SKILL.md`.
 
 ---
@@ -139,7 +142,7 @@ Render terminates TLS at its edge and forwards plain HTTP to the container's sin
 | Process mgr | supervisord; `autorestart` gives startup isolation. |
 | Secrets | Render Secret Files, one per project; injected into only that process by `launch.sh`. Logical isolation (not hardened vs same-UID). Service-level env vars are inherited by every process, so nothing project-specific ever goes there. |
 | Database | **SQLite is the default; Postgres is the exception** - see §10 for the conditions, the readiness gate and the conversion. A managed Postgres costs more per month than the whole instance it hangs off, so a project keeps one only by failing a stated condition. **All three projects were converted on 2026-09-08** and now run `db = "sqlite"` against `/data/<name>.db`; every managed Postgres behind them is suspended. |
-| Hosting service | The pre-existing Render service **"Gateway Backend"** (`srv-d28cecuuk2gs73f5b5qg`, `egunseli4@gmail.com`, frankfurt, starter) was reused - same account and region as the projects' Postgres instances, which are reachable only by their internal hostnames. A 1 GB disk (`dsk-dafqc31t0dsc73f9ehv0`) is mounted at `/data` since 2026-09-08; attaching it required disabling autoscaling, and it ends zero-downtime deploys. |
+| Hosting service | **"Gateway Backend"** now runs on `s2671343@ed.ac.uk`, Frankfurt, Starter, after the 2026-11-18 whole-gateway migration. Its 1 GB disk is mounted at `/data`; the current exact service/disk/workspace and rollback bindings are in §7. A disk ends zero-downtime deploys. |
 | Env injection | Universal via supervisord + `launch.sh` (works for any app, not just `load_dotenv`). |
 | Entrypoint | **Factory layout NOT assumed** - `backend_dir`, `app`, `start_cmd` are per-project in the manifest. |
 | Resources | Soft only (worker count). No watchdog; container OOM restarts all (accepted). |
@@ -197,17 +200,67 @@ types if it uses SQLite; a fast dependency-free health endpoint.
 
 ## 7. Status
 
-**Live.** The process-per-project gateway runs on "Gateway Backend" from this repo,
-hosting all three projects. Since **2026-09-08** each runs on its own SQLite file on a
-1 GB persistent disk, and **every managed Postgres behind these products is suspended**.
+### Current deployment — 2026-11-18
+
+**Live after the account migration.** The account email is the identity; local
+credential labels are aliases only. Before a gateway mutation, verify this exact
+workspace/service pair rather than choosing the same display name on another key.
+
+| Field | Current production |
+|---|---|
+| Render account | `s2671343@ed.ac.uk` |
+| Workspace | `tea-d8lvllmq1p3s739u7ug0` |
+| Service | **Gateway Backend** — `srv-dbuk4shsrm7s73f4mg20` |
+| Service URL | `https://gateway-backend-ohjf.onrender.com` |
+| Runtime / region / plan | Docker / Frankfurt / Starter |
+| Disk | `dsk-dbuk4spsrm7s73f4mgeg`, 1 GB at `/data` |
+| Production image commit | `24391ad8895c9e8b48855fbf73cca4ac6b2dbf5a` |
+| Build branch / Dockerfile | `codex/gateway-runtime-preservation-20261118` / `./Dockerfile.migration` |
+| Deploy policy | Auto-deploy **off**; normal gateway entrypoint, no maintenance override |
+| Secrets | `heard.env`, `insight.env`, `seorise.env`; opaque source/target equality verified |
+
+The migration build preserves the original business source and three submodule
+pins from gateway commit `51caf53294d37687d05773a30567da1da2fb9309`, with immutable
+Python/Caddy base images and the complete installed package versions from the
+running source. Documentation-only commits after `24391ad` do **not** change the
+deployed image and must not cause an unnecessary rebuild or a switch back to the
+floating `Dockerfile`/`main` defaults. `gateway up` defaults would reconcile the
+branch to `main`; read `skill/deploy.md` before using it.
+
+The final, write-frozen SQLite archive and complete restored files matched by
+checksum, schema, every table count, sequences and role/verification aggregates.
+All three databases passed integrity and foreign-key checks, including the new
+Heard records created after the first staging baseline. Normal-boot database
+metadata, 17 route/config checks and three nonmutating synthetic-user DB/auth
+checks passed. All five domain attachments moved; the four previously working
+domains passed public TLS/API checks. `api.in-sight.ai` remains the pre-existing
+unverified/no-DNS alias. SEO Rise's production frontend uses its stable public API
+hostname. These hosting rebuilds retain explicitly reviewed OS package revisions;
+they do not claim byte-identical OS/libpython binaries.
+
+**Rollback-only source:** `egunseli4@gmail.com`, service
+`srv-d28cecuuk2gs73f5b5qg`, disk `dsk-dafqc31t0dsc73f9ehv0`, old URL
+`https://backend-gateway-zyu0.onrender.com`. It has no production domain
+attachments. Keep it suspended or maintenance-only; its data is frozen at
+cutover. Once Edinburgh accepts writes, rollback requires freezing and preserving
+the newer Edinburgh data before restoring it to an inert source. Never simply
+resume/redeploy this old same-named service as if it were current production.
+
+Private migration receipts and retained archives are under
+`~/.local/share/render-migrations/2026-11-18-gateway/`; they are not repository
+credentials. Keep them for rollback. The migration branch has not been merged
+into `main`.
+
+All three projects run on their own SQLite files on the persistent disk. Their
+older managed Postgres instances remain suspended.
 
 | Project | Host-routed (live over HTTPS since 2026-09-06) | Path alias on the service host | Product's own API domain | Data |
 |---|---|---|---|---|
-| heard | `https://api.heard.erdemgunseli.com` | `https://backend-gateway-zyu0.onrender.com/heard/…` | **`api.heard.cc`** (moved here 2026-09-07); heard.cc's frontend calls it | `/data/heard.db` — 663 rows, 9 tables |
-| insight | `https://api.insight.erdemgunseli.com` (the extension's `BASE_URL`) | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai` registered here 2026-09-07, but no DNS record for it exists | `/data/insight.db` — 23 rows, 4 tables |
-| seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - | `/data/seorise.db` — 401 rows, 6 tables |
+| heard | `https://api.heard.erdemgunseli.com` | `https://gateway-backend-ohjf.onrender.com/heard/…` | **`api.heard.cc`**; heard.cc's frontend calls it | `/data/heard.db` — 226 users, 10 tables at cutover |
+| insight | `https://api.insight.erdemgunseli.com` | `…/insight/…` and the legacy `…/in-sight/…` | `api.in-sight.ai`, still no DNS record | `/data/insight.db` — 4 users, 4 tables at cutover |
+| seorise | `https://api.seorise.erdemgunseli.com` | `…/seorise/…` and the legacy `…/seo-rise/…` | - | `/data/seorise.db` — 34 users, 6 tables at cutover |
 
-**Everything else is suspended.** The three standalone services (Heard Backend, In-Sight
+**Older rollback resources remain suspended:** the three standalone services (Heard Backend, In-Sight
 AI Backend, SEO Rise Backend) since 2026-09-07; their two databases since then; and
 **Heard DB + Gateway DB since 2026-09-08**. Nothing has been deleted - all of it is the
 rollback. Evidence: `verification/2026-09-06/`, `verification/2026-09-07/`,
@@ -532,7 +585,11 @@ booting. Reverse the move with `db_pump.py`, which is bidirectional.
   tests, then boot the real thing (Caddy binary + `pip install supervisor` + the
   project venvs, `GATEWAY_APP_ROOT` pointed at a copy of the checkout, throwaway
   secret files, `PORT=18080`) and probe Host + path routing exactly as §7 lists.
-- Credentials: `RENDER_API_KEY_GATEWAY` (the `egunseli4@gmail.com` account) in the
-  environment or `~/.config/gateway/render.env`; never in the repo. The Secret File
+- Credentials: `RENDER_API_KEY_GATEWAY` is a legacy process selector for the current
+  account in §7 (`s2671343@ed.ac.uk`), not for the retained old service. Resolve its
+  existing key from the authoritative credential store and verify workspace/service
+  identity before mutating; do not persist a second copy just to create the label.
+  The CLI also supports an external `~/.config/gateway/render.env`; never put keys
+  in the repo. The Secret File
   contents are assembled from the projects' existing Render env - never commit or
   print them.

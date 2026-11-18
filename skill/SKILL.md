@@ -11,6 +11,9 @@ this skill sequences them and makes the judgement calls.
 
 ## Preconditions (check first)
 
+- Read the current account/workspace/service-ID binding in `CLAUDE.md` §7 and the
+  production precautions in `deploy.md`. A retained rollback service has the same
+  name; verify the exact ID before treating a local `gateway` key label as production.
 - **Both Render API keys must be in the environment** (decision #6):
   `RENDER_API_KEY_GATEWAY` and `RENDER_API_KEY_STANDALONE`. If either is missing,
   **warn the user and stop** - do not run a partial swap.
@@ -22,7 +25,7 @@ this skill sequences them and makes the judgement calls.
 
 ## Domain model (decision #1)
 
-Projects always use `<name>.api.erdemgunseli.com` for their API, in or out of the
+Projects use `api.<name>.erdemgunseli.com` for their API, in or out of the
 gateway. Swaps therefore **do not touch DNS** - only routing/process state changes.
 
 ## Database model (decision #2)
@@ -36,7 +39,7 @@ automatic). Preserve primary keys; the pump resyncs Postgres sequences on swap-o
 1. `gateway add <name> --repo <url> [--backend-dir ...] [--app ...] [--db sqlite]`
 2. Create the project's secret file locally (app secrets only; the gateway owns
    `DATABASE_URL` for SQLite) and `gateway secrets-push <name> --file <path>`.
-3. `gateway deploy` and `gateway wait https://<name>.api.erdemgunseli.com/<health>`.
+3. `gateway deploy` and `gateway wait https://api.<name>.erdemgunseli.com/<health>`.
    The new SQLite DB is provisioned on first boot (schema via create_all; see
    "Migrations" below).
 4. Copy data in: run `db_pump.py` with `--from <standalone Postgres URL>`
