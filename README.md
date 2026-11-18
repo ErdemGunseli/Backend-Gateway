@@ -23,7 +23,8 @@ showcase projects. Serious projects graduate to their own instance.
 - **Caddy** routes by Host (`api.<name>.erdemgunseli.com` plus any `extra_hosts`),
   and by path prefix (`/<name>/…`, prefix stripped) on any other host - so the
   service's own onrender.com address reaches every project before DNS exists, and
-  the previous gateway's `/in-sight`, `/seo-rise` URLs keep working. Render
+  the legacy `/in-sight`, `/seo-rise` path aliases work on the current service
+  base. Old Render hostnames are retired; clients using those bases must be repointed. Render
   terminates TLS at its edge, so Caddy is plain HTTP. Gateway health
   (`/__gateway/health`) passes whenever Caddy is up - one bad project never
   restarts the container.
@@ -42,6 +43,7 @@ showcase projects. Serious projects graduate to their own instance.
 ```
 gateway.toml              manifest (single source of truth)
 Dockerfile                caddy + supervisord + per-project venvs
+Dockerfile.migration      current production build, pinned Python/Caddy/packages
 entrypoint.sh             regenerate config -> exec supervisord
 render.yaml               Render blueprint (disk, health check)
 scripts/
@@ -79,19 +81,24 @@ warns and stops.
 ## Resolved design decisions
 
 Domain: `api.<name>.erdemgunseli.com`, one DNS-only CNAME per project on Cloudflare
-(swap never touches DNS), with path-prefix routing on the service's own host until a
-project's DNS exists. DB: SQLite in
-gateway / Postgres standalone - the three current projects keep their existing
-Postgres (`db = "external"`). Env injection: universal via supervisord +
+(project swaps retain these public hostnames), with path-prefix routing on the service's own host until a
+project's DNS exists. DB: SQLite in the gateway / Postgres standalone; all three
+current projects use `/data/<name>.db` on the persistent disk. Env injection: universal via supervisord +
 `launch.sh`. Entrypoint: fully per-project (no factory assumption). Resources:
-soft (worker count) only. Health: Caddy-up. Backups: out of scope. Full table and
+soft (worker count) only. Health: Caddy-up. Backups: Render disk snapshots plus the
+verified migration archive. Full table and
 the reasoning: `CLAUDE.md` §5.
 
 ## Status
 
-Live since 2026-09-06 on the Render service "Gateway Backend"
-(`egunseli4@gmail.com`, frankfurt, starter), hosting Heard, In-Sight and SEO Rise
-against their production databases. Reachable today by path on
-`https://backend-gateway-zyu0.onrender.com/{heard,insight,seorise}/…` (legacy
-`/in-sight`, `/seo-rise` too) and, since the erdemgunseli.com zone went active on
-Cloudflare the same day, at `https://api.{heard,insight,seorise}.erdemgunseli.com`. `CLAUDE.md` §7–8 carry the verified state and what is left.
+The gateway moved to **s2671343@ed.ac.uk** on 2026-11-18. Heard, In-Sight and SEO
+Rise now run on "Gateway Backend" in Frankfurt, Starter, with the three copied
+SQLite databases on its 1 GB disk. Path access is
+`https://gateway-backend-ohjf.onrender.com/{heard,insight,seorise}/…` (legacy
+`/in-sight`, `/seo-rise` too); the working public API domains are unchanged.
+
+The canonical account, workspace, service/disk IDs, pinned production image and
+rollback binding are in **`CLAUDE.md` §7, Current deployment**. Read that binding
+and `skill/deploy.md` before operating: the old account retains a same-named service
+for rollback, and `up` defaults do not preserve the current locked build. Documentation
+commits do not deploy; auto-deploy remains off and the live image stays pinned.

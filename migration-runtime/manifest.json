@@ -1,0 +1,16 @@
+{
+  "source_gateway_commit": "51caf53294d37687d05773a30567da1da2fb9309",
+  "source_python_version": "3.11.16",
+  "source_caddy_version": "2.11.4",
+  "source_packages_digest": "7d54eafa00548e8bcf4a669d237de7da6d7be658af397196baa7ae31a3eb804a",
+  "base_images": {
+    "python": "sha256:e41613d42d4891e4930f79523f93f81bbc7632584ec65e36ab055f41a800b41e",
+    "caddy": "sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52"
+  },
+  "submodules": {
+    "projects/heard": "b94ddfaebd5fd887a30ed4aa5de5d833438d3a3f",
+    "projects/insight": "43d9287a6f41789e269c3cec9bfcdb88010ae94e",
+    "projects/seorise": "a6cb617a7fc81417c6c09d2270d95ccfa683b136"
+  },
+  "purpose": "Deployment-only build inputs; original business source, Dockerfile, manifest and submodule gitlinks remain unchanged."
+}
